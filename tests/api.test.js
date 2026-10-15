@@ -93,6 +93,7 @@ test('стая: създай, влез с код, готовност, старт
 
     // Чат.
     await b.sendChat(code, vb.get().chatDocs ?? [], { text: '  Добра игра! ' });
+    await tick();
     await a.sendChat(code, va.get().chatDocs ?? [], { emoji: '🎉' });
     await tick();
     assert.deepEqual(va.get().chat.map((m) => m.text ?? m.emoji), ['Добра игра!', '🎉']);

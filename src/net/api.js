@@ -174,7 +174,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
           view.chatDocs = docs;
           view.chat = docs
             .flatMap((d) => (d.data?.msgs ?? []).map((m) => ({ ...m, p: d.id })))
-            .sort((a, b) => a.t - b.t);
+            .sort((a, b) => a.t - b.t || a.p.localeCompare(b.p));
           emit();
         }),
       ];
