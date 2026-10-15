@@ -62,6 +62,10 @@ const ACT = {
       if (await tgt.count()) await tgt.first().click();
     }
   },
+  'Морски бой': async (p) => {
+    const cells = p.locator('button.bs-cell:not([disabled])');
+    await cells.nth(Math.floor(Math.random() * (await cells.count()))).click();
+  },
   'Мемори': async (p) => {
     const cards = p.locator('.mm-card:not([disabled])');
     await cards.nth(Math.floor(Math.random() * (await cards.count()))).click();
@@ -102,6 +106,12 @@ async function playGame(name, n, tag) {
   });
   await host.getByRole('button', { name: 'Старт' }).click();
 
+  if (tag === 'bs') {
+    for (const p of pages) {
+      await p.getByRole('button', { name: 'Разбъркай' }).click();
+      await p.getByRole('button', { name: 'Готово' }).click();
+    }
+  }
   let moves = 0, shot = false;
   const deadline = Date.now() + 480000;
   while (Date.now() < deadline) {
@@ -120,6 +130,10 @@ async function playGame(name, n, tag) {
   }
   const banners = await Promise.all(pages.map((p) => p.locator('.result-banner h2').textContent({ timeout: 5000 }).catch(() => 'НЯМА')));
   await host.screenshot({ path: `${out}/${tag}-end.png`, fullPage: true });
+  if (tag === 'bs') {
+    await host.locator('.bs-verify', { hasText: 'съвпада' }).waitFor({ timeout: 10000 }).catch(() => {});
+    console.log('проверка на флотовете:', await host.locator('.bs-verify').textContent().catch(() => 'НЯМА'));
+  }
   console.log(`${name} (${n} играчи): ${moves} хода → ${banners.join(' / ')}`);
   await ctx.close();
   return banners;
@@ -128,7 +142,7 @@ async function playGame(name, n, tag) {
 const ALL = [
   ['Четири в редица', 2, 'c4'], ['Реверси', 2, 'rv'], ['Точки и кутийки', 3, 'db'], ['Цветна осмица', 3, 'c8'],
   ['Ултимат морски шах', 2, 'ut'], ['Покер със зарове', 2, 'dp'], ['Мемори', 3, 'mm'],
-  ['Не се сърди човече', 3, 'ld'], ['Табла', 2, 'tb'],
+  ['Не се сърди човече', 3, 'ld'], ['Табла', 2, 'tb'], ['Морски бой', 2, 'bs'],
 ];
 const only = process.env.ONLY?.split(',');
 const results = [];

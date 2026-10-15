@@ -32,6 +32,9 @@ export const REASONS = {
   'move-first': 'Първо премести фигура.',
   'piece-blocked': 'Тази фигура не може да се мести с това хвърляне.',
   'bad-step': 'Този ход не е позволен с тези зарове.',
+  'shot-twice': 'Вече си стрелял там.',
+  'wait-answer': 'Изчакай отговора за предишния изстрел.',
+  'wait-place': 'Изчакай и двамата да разположат корабите.',
   over: 'Партидата свърши.',
 };
 
@@ -56,6 +59,12 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   let autoStartFor = -1;
   let resignArmed = false;
   let destroyed = false;
+  // Лични данни на играта за рунда (напр. скрития флот) и памет за чернови.
+  const secret = { round: 0, data: null, loaded: false, loading: null };
+  let scratch = { round: 0 };
+  let reveals = {};
+  let revealedRound = 0;
+  let onTurnFor = '';
   const narrow = window.matchMedia('(max-width: 899px)');
 
   // ---- постоянни области ----
@@ -324,12 +333,15 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const myTurn = result.current === me;
     const status = h('div', { class: `status-line${myTurn ? ' mine' : ''}` },
       h('span', { class: 'disc-dot', '--disc': `var(--seat-${room.players.indexOf(result.current) + 1})`, 'aria-hidden': 'true' }),
-      h('span', { text: myTurn ? 'Твой ход' : `Ход на ${nickOf(result.current)}` }),
+      h('span', { text: playedGame.status?.(result.state, me, nickOf) ?? (myTurn ? 'Твой ход' : `Ход на ${nickOf(result.current)}`) }),
       timerEl,
     );
+    if (scratch.round !== room.round) scratch = { round: room.round };
     playedGame.render(boardEl, result.state, {
-      me, over: result.over || pending, players: room.players, nickOf, sound,
+      me, over: result.over || pending, players: room.players, nickOf, sound, toast, scratch,
       onMove: (move) => sendMove(move),
+      secret: secretApi(room.round),
+      reveals: Object.fromEntries(Object.entries(reveals).filter(([, v]) => v.round === room.round)),
     });
     const parts = [result.over ? resultBanner() : status, boardEl];
     if (!result.over && room.players.includes(me)) {
@@ -350,6 +362,24 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     }
     if (result.over) parts.splice(1, 0, rematchPanel());
     mount(stageEl, parts);
+  }
+
+  function secretApi(round) {
+    const path = `data/users/${me}/secret-${code}-r${round}`;
+    if (secret.round !== round) Object.assign(secret, { round, data: null, loaded: false, loading: null });
+    return {
+      get data() { return secret.data; },
+      get loaded() { return secret.loaded; },
+      load() {
+        if (secret.loaded) return Promise.resolve(secret.data);
+        secret.loading ??= api.store.get(path).then((d) => {
+          if (secret.round === round) { secret.data = d; secret.loaded = true; stageKey = ''; update(); }
+          return d;
+        }).catch(() => null);
+        return secret.loading;
+      },
+      async save(d) { await api.store.set(path, d); secret.data = d; secret.loaded = true; },
+    };
   }
 
   async function sendMove(move) {
@@ -436,6 +466,25 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     }
     if (room.status === 'playing') storageSet('lastGame', room.gameId);
 
+    // Игри с лични данни: заредени ли са, автоматичен отговор, разкриване накрая.
+    if (result?.game.usesSecret && room.players.includes(me)) {
+      const sec = secretApi(room.round);
+      if (!sec.loaded) sec.load();
+      const key = `${room.round}:${result.nextIndex}`;
+      if (!result.over && result.game.onTurn && onTurnFor !== key) {
+        onTurnFor = key;
+        result.game.onTurn(result.state, { me, secret: sec }).then((move) => {
+          if (move && !destroyed) api.sendMove(code, room.round, move, result.nextIndex).catch(() => { onTurnFor = ''; });
+        }).catch(() => { onTurnFor = ''; });
+      }
+      if (result.over && revealedRound !== room.round) {
+        revealedRound = room.round;
+        sec.load().then((d) => {
+          if (d) api.store.set(`rooms/${code}/reveal/${me}`, { round: room.round, ...d }).catch(() => { revealedRound = 0; });
+        });
+      }
+    }
+
     // Реванш: домакинът стартира, когато всички от последната партида са готови.
     if (result?.over && room.hostId === me && autoStartFor !== room.round) {
       const { game, ready, waiting, fits } = rematchState();
@@ -448,6 +497,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     renderSeats();
     const key = JSON.stringify([
       room.status, room.round, room.gameId, room.timerSec, room.hostId, acc, result?.over, pending, resignArmed,
+      secret.loaded, Object.keys(reveals).length,
       activeMembers(view.members).map((m) => [m.id, m.data.readyFor, m.data.nick, m.data.avatar]),
     ]);
     if (key !== stageKey) { stageKey = key; renderStage(); }
@@ -495,6 +545,11 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     renderChat();
   });
 
+  const unwatchReveals = api.store.watchCol(`rooms/${code}/reveal`, (docs) => {
+    reveals = Object.fromEntries(docs.filter((d) => d.data).map((d) => [d.id, d.data]));
+    if (view?.room) { stageKey = ''; update(); }
+  });
+
   let presence = { leave() {} };
   api.store.joinPresence(`megdan-${code.toLowerCase()}`, (ids) => {
     if (!presenceSince) {
@@ -512,6 +567,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   return () => {
     destroyed = true;
     unwatch();
+    unwatchReveals();
     presence.leave();
     clearInterval(clock);
     clearTimeout(pendingTimer);
