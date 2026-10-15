@@ -4,8 +4,11 @@ import connect4 from './connect4.js';
 import reversi from './reversi.js';
 import dots from './dots.js';
 import color8 from './color8.js';
+import uttt from './uttt.js';
+import dice from './dice.js';
+import memory from './memory.js';
 
-export const GAMES = [connect4, reversi, dots, color8];
+export const GAMES = [connect4, reversi, dots, color8, uttt, dice, memory];
 export const gameById = (id) => GAMES.find((g) => g.id === id) ?? null;
 
 let injected = false;

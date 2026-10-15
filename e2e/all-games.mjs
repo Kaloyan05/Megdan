@@ -28,6 +28,26 @@ const ACT = {
     if (await p.locator('.c8-pile:not([disabled])').count()) return p.locator('.c8-pile').click();
     return p.getByRole('button', { name: 'Пропусни' }).click();
   },
+  'Ултимат морски шах': async (p) => {
+    const cells = p.locator('.ut-cell:not([disabled])');
+    await cells.nth(Math.floor(Math.random() * (await cells.count()))).click();
+  },
+  'Покер със зарове': async (p) => {
+    const picks = p.locator('.dp-pick');
+    const roll = p.locator('.dp-tray .btn-primary:not([disabled])');
+    if (await picks.count() && (!(await roll.count()) || Math.random() < 0.4)) {
+      const vals = await picks.allTextContents();
+      const best = vals.map(Number).reduce((bi, v, i, a) => (v > a[bi] ? i : bi), 0);
+      return picks.nth(best).click();
+    }
+    const dice = p.locator('.dp-die:not([disabled])');
+    if (await dice.count()) await dice.first().click();
+    return roll.click();
+  },
+  'Мемори': async (p) => {
+    const cards = p.locator('.mm-card:not([disabled])');
+    await cards.nth(Math.floor(Math.random() * (await cards.count()))).click();
+  },
 };
 
 async function setProfile(p, nick) {
@@ -65,7 +85,7 @@ async function playGame(name, n, tag) {
   await host.getByRole('button', { name: 'Старт' }).click();
 
   let moves = 0, shot = false;
-  const deadline = Date.now() + 120000;
+  const deadline = Date.now() + 240000;
   while (Date.now() < deadline) {
     if (await host.locator('.result-banner').count()) break;
     let acted = false;
@@ -87,11 +107,13 @@ async function playGame(name, n, tag) {
   return banners;
 }
 
+const ALL = [
+  ['Четири в редица', 2, 'c4'], ['Реверси', 2, 'rv'], ['Точки и кутийки', 3, 'db'], ['Цветна осмица', 3, 'c8'],
+  ['Ултимат морски шах', 2, 'ut'], ['Покер със зарове', 2, 'dp'], ['Мемори', 3, 'mm'],
+];
+const only = process.env.ONLY?.split(',');
 const results = [];
-results.push(await playGame('Четири в редица', 2, 'c4'));
-results.push(await playGame('Реверси', 2, 'rv'));
-results.push(await playGame('Точки и кутийки', 3, 'db'));
-results.push(await playGame('Цветна осмица', 3, 'c8'));
+for (const [name, n, tag] of ALL) if (!only || only.includes(tag)) results.push(await playGame(name, n, tag));
 await browser.close();
 
 const ok = results.every((b) => !b.includes('НЯМА'));
