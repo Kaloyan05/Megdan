@@ -45,6 +45,23 @@ const ACT = {
     if (await dice.count()) await dice.first().click();
     return roll.click();
   },
+  'Не се сърди човече': async (p) => {
+    const pcs = p.locator('.ld-piece.can');
+    if (await pcs.count()) return pcs.first().click();
+    return p.locator('.ld-bar .btn-primary:not([disabled])').click();
+  },
+  'Табла': async (p) => {
+    const roll = p.locator('.ld-bar .btn-primary:not([disabled])');
+    if (await roll.count()) return roll.click();
+    const tgt = p.locator('.tb-pt.tgt, .tb-offbox.tgt');
+    if (await tgt.count()) return tgt.first().click();
+    const src = p.locator('.tb-pt.src, .tb-barcol.src');
+    if (await src.count()) {
+      await src.first().click();
+      await p.waitForTimeout(30);
+      if (await tgt.count()) await tgt.first().click();
+    }
+  },
   'Мемори': async (p) => {
     const cards = p.locator('.mm-card:not([disabled])');
     await cards.nth(Math.floor(Math.random() * (await cards.count()))).click();
@@ -86,7 +103,7 @@ async function playGame(name, n, tag) {
   await host.getByRole('button', { name: 'Старт' }).click();
 
   let moves = 0, shot = false;
-  const deadline = Date.now() + 240000;
+  const deadline = Date.now() + 480000;
   while (Date.now() < deadline) {
     if (await host.locator('.result-banner').count()) break;
     let acted = false;
@@ -111,6 +128,7 @@ async function playGame(name, n, tag) {
 const ALL = [
   ['Четири в редица', 2, 'c4'], ['Реверси', 2, 'rv'], ['Точки и кутийки', 3, 'db'], ['Цветна осмица', 3, 'c8'],
   ['Ултимат морски шах', 2, 'ut'], ['Покер със зарове', 2, 'dp'], ['Мемори', 3, 'mm'],
+  ['Не се сърди човече', 3, 'ld'], ['Табла', 2, 'tb'],
 ];
 const only = process.env.ONLY?.split(',');
 const results = [];

@@ -354,12 +354,14 @@ body.first-run .nav-bottom, body.first-run .nav-top { display: none; }
   .chat-fab {
     display: inline-flex; align-items: center; gap: 6px; position: fixed; z-index: 16;
     right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px));
-    min-height: 48px; padding: 8px 16px; border-radius: var(--r-pill); border: 2px solid var(--ink);
+    min-height: 52px; min-width: 52px; justify-content: center; padding: 6px; border-radius: var(--r-pill); border: 2px solid var(--ink); font-size: 1.3rem;
     background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer;
   }
   .chat-fab[aria-expanded="true"] { visibility: hidden; }
 }
 @media (min-width: 720px) and (max-width: 899px) { .chat-fab { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); } }
+.chat-fab .fab-label { display: none; }
+.chat-fab .fab-count { position: absolute; top: -6px; right: -6px; }
 .fab-count {
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink);
   font-size: .75rem; font-weight: 800; display: inline-grid; place-items: center;

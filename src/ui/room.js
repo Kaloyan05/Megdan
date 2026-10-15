@@ -29,6 +29,9 @@ export const REASONS = {
   'cat-used': 'Тази графа вече е попълнена.',
   'no-rolls': 'Нямаш повече хвърляния. Избери графа.',
   'card-open': 'Тази карта вече е обърната.',
+  'move-first': 'Първо премести фигура.',
+  'piece-blocked': 'Тази фигура не може да се мести с това хвърляне.',
+  'bad-step': 'Този ход не е позволен с тези зарове.',
   over: 'Партидата свърши.',
 };
 
@@ -120,7 +123,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   const fabCount = h('span', { class: 'fab-count', hidden: true });
   const chatFab = h('button', {
     class: 'chat-fab', type: 'button', 'aria-controls': 'room-chat', 'aria-expanded': 'false', 'aria-label': 'Отвори чата',
-  }, h('span', { 'aria-hidden': 'true', text: '💬' }), h('span', { text: 'Чат' }), fabCount);
+  }, h('span', { 'aria-hidden': 'true', text: '💬' }), h('span', { class: 'fab-label', text: 'Чат' }), fabCount);
   const setChatOpen = (open) => {
     chatPanel.classList.toggle('open', open);
     chatFab.setAttribute('aria-expanded', String(open));
