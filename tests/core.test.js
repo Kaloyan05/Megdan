@@ -93,6 +93,23 @@ test('класиране по подразбиране от победителя
   assert.deepEqual(placementsOf(race, r.state, P), { a: 2, b: 1 });
 });
 
+test('предаване: при двама другият печели, после ходове не минават', () => {
+  const r = replay(race, {
+    seed: 's', players: P,
+    log: [rec(0, 'a', 3), { i: 1, p: 'a', t: 1, m: { type: 'resign' } }, rec(2, 'b', 1)],
+  });
+  assert.equal(r.over, true);
+  assert.equal(r.winner, 'b');
+  assert.deepEqual(r.placements, { a: 2, b: 1 });
+  assert.equal(r.rejected[0].reason, 'over');
+});
+
+test('предаване при трима: предалият е последен, другите си делят първо място', () => {
+  const r = replay(race, { seed: 's', players: ['a', 'b', 'c'], log: [{ i: 0, p: 'c', t: 0, m: { type: 'resign' } }] });
+  assert.deepEqual(r.placements, { a: 1, b: 1, c: 2 });
+  assert.equal(r.winner, 'draw');
+});
+
 test('домакин: следващият по ред на влизане', () => {
   const m = [{ id: 'a', joinedAt: 1 }, { id: 'c', joinedAt: 3 }, { id: 'b', joinedAt: 2 }];
   assert.equal(nextHost(m, 'a'), 'b');

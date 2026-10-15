@@ -20,17 +20,24 @@ export function sortLog(log) {
 export function replay(game, { seed, players, log = [], startedAt = 0, turnLimitMs = 0 }) {
   let state = game.init(seed, players);
   let turnStartedAt = startedAt;
+  let resigned = null;
   const accepted = [];
   const rejected = [];
 
   for (const rec of sortLog(log)) {
     const reject = (reason) => rejected.push({ ...rec, reason });
 
-    if (game.isOver(state)) { reject('over'); continue; }
+    if (resigned || game.isOver(state)) { reject('over'); continue; }
     if (!players.includes(rec.p)) { reject('not-a-player'); continue; }
 
     let move = rec.m;
     let actor = rec.p;
+
+    if (move && move.type === 'resign') {
+      resigned = actor;
+      accepted.push({ ...rec, actor, applied: move });
+      continue;
+    }
 
     if (move && move.type === 'timeout') {
       if (!turnLimitMs) { reject('no-timer'); continue; }
@@ -49,24 +56,38 @@ export function replay(game, { seed, players, log = [], startedAt = 0, turnLimit
     accepted.push({ ...rec, actor, applied: move });
   }
 
-  const over = game.isOver(state);
+  const over = Boolean(resigned) || game.isOver(state);
+  const placements = over ? placementsOf(game, state, players, resigned) : null;
+  const firsts = placements ? players.filter((p) => placements[p] === 1) : [];
   return {
     state,
     accepted,
     rejected,
     turnStartedAt,
     over,
-    winner: over ? game.winner(state) : null,
+    resigned,
+    placements,
+    winner: !over ? null : firsts.length === 1 ? firsts[0] : 'draw',
     current: over ? null : game.currentPlayer(state),
     nextIndex: log.reduce((max, r) => Math.max(max, r.i + 1), 0),
   };
 }
 
 // Класиране след края: { playerId: място } (1 = най-добро, равни места са възможни).
-export function placementsOf(game, state, players) {
+// Предалият се е последен; при двама другият печели.
+export function placementsOf(game, state, players, resigned = null) {
+  const out = {};
+  if (resigned) {
+    const rest = players.filter((p) => p !== resigned);
+    const base = rest.length > 1 && game.placements ? game.placements(state) : {};
+    const ranks = [...new Set(rest.map((p) => base[p] ?? 1))].sort((a, b) => a - b);
+    for (const p of rest) out[p] = ranks.indexOf(base[p] ?? 1) + 1;
+    const last = Math.max(1, ...Object.values(out)) + 1;
+    out[resigned] = last;
+    return out;
+  }
   if (game.placements) return game.placements(state);
   const w = game.winner(state);
-  const out = {};
   for (const p of players) out[p] = w === 'draw' ? 1 : p === w ? 1 : 2;
   return out;
 }
