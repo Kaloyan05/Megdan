@@ -208,7 +208,7 @@ export default {
     // моята ръка
     const handWrap = make('div', 'c8-hand-wrap');
     if (meSeat >= 0) {
-      const hand = make('div', 'c8-hand');
+      const hand = make('div', 'c8-hand' + (myTurn ? ' my-turn' : ''));
       hand.setAttribute('aria-label', 'Твоите карти');
       const sorted = s.hands[meSeat].slice().sort((a, b) => card(a).color - card(b).color || KINDS.indexOf(card(a).kind) - KINDS.indexOf(card(b).kind));
       for (const id of sorted) {
@@ -306,9 +306,11 @@ export default {
 .c8-color { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; background:var(--c); color:#fff; font-weight:700; font-size:.75rem; box-shadow:inset 0 0 0 4px rgb(255 255 255 / .6); text-shadow:0 1px 0 rgb(0 0 0 / .3); }
 .c8-msg { text-align:center; min-height:1.5em; color:var(--ink-2); font-weight:500; }
 .c8-hand-wrap { width:100%; display:grid; gap:10px; justify-items:center; }
-.c8-hand { display:flex; gap:6px; overflow-x:auto; max-width:100%; padding:18px 6px 10px; scroll-snap-type:x proximity; }
+.c8-hand { display:flex; overflow-x:auto; max-width:100%; padding:18px 6px 10px; scroll-snap-type:x proximity; }
 .c8-in-hand { cursor:pointer; scroll-snap-align:center; transition:transform .12s ease; }
-.c8-in-hand:disabled { cursor:default; filter:saturate(.45) brightness(.92); }
+.c8-in-hand + .c8-in-hand { margin-left:-22px; }
+.c8-in-hand:disabled { cursor:default; }
+.c8-hand.my-turn .c8-in-hand:disabled { filter:saturate(.4) brightness(.9); }
 .c8-in-hand.playable { transform:translateY(-12px); }
 .c8-in-hand.playable:hover { transform:translateY(-16px); }
 .c8-in-hand.drawn { outline:3px solid var(--sun); outline-offset:2px; }
