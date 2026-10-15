@@ -299,6 +299,7 @@ export default {
 .c8-card { --c: var(--seat-1); width:64px; height:92px; flex:none; border-radius:10px; border:3px solid #fff; background:var(--c); color:#fff;
   display:grid; place-items:center; font:800 1.6rem/1 var(--f-display); text-shadow:0 2px 0 rgb(0 0 0 / .25); box-shadow:0 4px 0 rgb(0 0 0 / .25); position:relative; }
 .c8-card .corner { position:absolute; top:5px; left:7px; font-size:.75rem; }
+.c8-card.light { color:#1b2333; text-shadow:none; }
 .c8-card.wild { background:conic-gradient(var(--seat-1) 0 25%, var(--seat-2) 0 50%, var(--seat-3) 0 75%, var(--seat-4) 0); }
 .c8-card.wild .val { background:#fff; color:#1b2333; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; text-shadow:none; }
 .c8-top { width:76px; height:108px; font-size:2rem; animation:c8in .25s ease-out; }
@@ -341,6 +342,7 @@ function cardEl(id, make, tag = 'div') {
   const c = card(id);
   const el = make(tag, 'c8-card' + (c.kind === '8' ? ' wild' : ''));
   if (c.kind !== '8') el.style.setProperty('--c', `var(--seat-${c.color + 1})`);
+  if (c.color === 2 && c.kind !== '8') el.classList.add('light');
   const label = LABEL[c.kind] ?? c.kind;
   el.append(make('span', 'corner', label), make('span', 'val', label));
   return el;

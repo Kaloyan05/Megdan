@@ -15,7 +15,7 @@ createServer(async (req, res) => {
   if (file.startsWith('..')) { res.writeHead(403).end(); return; }
   try {
     const data = await readFile(join(root, file));
-    if (file === 'index.html') {
+    if (file === 'index.html' || file === 'dist/index.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(skeleton(data.toString()));
     } else {
       res.writeHead(200, { 'content-type': `${types[extname(file)] ?? 'application/octet-stream'}; charset=utf-8` }).end(data);

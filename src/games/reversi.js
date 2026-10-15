@@ -99,7 +99,7 @@ export default {
 
     const grid = document.createElement('div');
     grid.className = 'rv';
-    grid.setAttribute('role', 'grid');
+    grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', 'Дъска');
     const letters = 'ABCDEFGH';
     for (let i = 0; i < N * N; i++) {

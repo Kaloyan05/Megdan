@@ -47,7 +47,10 @@ export function renderRoom(root, { api, code, onLeave }) {
 
   // ---- постоянни области ----
   const seatsEl = h('div', { class: 'seats', 'aria-label': 'Играчи' });
-  const stageEl = h('div', { class: 'stage', 'aria-live': 'polite' });
+  const stageEl = h('div', { class: 'stage' });
+  const announcer = h('p', { class: 'sr-only', role: 'status', 'aria-live': 'polite' });
+  let lastAnnounce = '';
+  const announce = (text) => { if (text && text !== lastAnnounce) { lastAnnounce = text; announcer.textContent = text; } };
   const timerEl = h('span', { class: 'timer', hidden: true });
   const chatLog = h('div', { class: 'chat-log', role: 'log', 'aria-label': 'Чат' });
   const chatInput = h('input', { class: 'input', id: 'chat-text', maxLength: 200, autocomplete: 'off', placeholder: 'Напиши нещо' });
@@ -116,6 +119,7 @@ export function renderRoom(root, { api, code, onLeave }) {
       ),
     ),
     inviteFallback,
+    announcer,
     seatsEl,
     h('div', { class: 'room' },
       stageEl,
@@ -383,6 +387,11 @@ export function renderRoom(root, { api, code, onLeave }) {
     if (key !== stageKey) {
       stageKey = key;
       renderStage();
+    }
+    if (result) {
+      announce(result.over
+        ? (result.winner === me ? 'Победа!' : result.winner === 'draw' ? 'Равенство.' : `Печели ${nickOf(result.winner)}.`)
+        : (result.current === me ? 'Твой ход.' : `Ход на ${nickOf(result.current)}.`));
     }
     tickTimer();
   }

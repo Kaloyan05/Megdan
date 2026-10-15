@@ -82,7 +82,7 @@ export default {
     el.innerHTML = '';
     const grid = document.createElement('div');
     grid.className = 'c4';
-    grid.setAttribute('role', 'grid');
+    grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', 'Дъска');
     for (let c = 0; c < COLS; c++) {
       const col = document.createElement('button');

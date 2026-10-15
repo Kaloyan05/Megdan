@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "dev": "node serve.js 8080"
+    "dev": "node serve.js 8080",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
   }
 }

@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 const require = createRequire('/opt/npm-tools/node_modules/');
 const { chromium } = require('playwright');
 
-const BASE = 'http://localhost:8080/';
+const BASE = process.env.BASE ?? 'http://localhost:8080/';
 const out = process.argv[2] ?? '.';
 const errors = [];
 
@@ -49,14 +49,14 @@ await p1.getByRole('button', { name: 'Старт' }).click();
 // Калоян печели вертикално в колона 1; Мила играе в колона 2.
 const moves = [[p1, 1], [p2, 2], [p1, 1], [p2, 2], [p1, 1], [p2, 2]];
 for (const [p, col] of moves) {
-  await p.getByText('Твой ход').waitFor();
+  await p.locator('.status-line', { hasText: 'Твой ход' }).waitFor();
   await p.getByRole('button', { name: `Колона ${col}` }).click();
 }
 // Ход извън ред: Мила опитва, докато е ред на Калоян → бутоните са изключени.
-await p2.getByText('Ход на Калоян').waitFor();
+await p2.locator('.status-line', { hasText: 'Ход на Калоян' }).waitFor();
 const disabled = await p2.getByRole('button', { name: 'Колона 3' }).isDisabled();
 console.log('ход извън ред блокиран:', disabled);
-await p1.getByText('Твой ход').waitFor();
+await p1.locator('.status-line', { hasText: 'Твой ход' }).waitFor();
 await p2.screenshot({ path: `${out}/04-playing.png`, fullPage: true });
 await p1.getByRole('button', { name: 'Колона 1' }).click();
 
@@ -73,12 +73,12 @@ await p1.getByText('Добра игра!').waitFor();
 // Реванш
 await p2.getByRole('button', { name: 'Готов', exact: true }).click();
 await p1.getByRole('button', { name: 'Нова партида' }).click();
-await p2.getByText(/Твой ход|Ход на Калоян/).waitFor();
+await p2.locator('.status-line', { hasText: /Твой ход|Ход на Калоян/ }).waitFor();
 
 // Презареждане по средата
 await p2.reload();
 await p2.locator('.room-code').waitFor();
-await p2.getByText(/Твой ход|Ход на Калоян/).waitFor();
+await p2.locator('.status-line', { hasText: /Твой ход|Ход на Калоян/ }).waitFor();
 console.log('презареждане: ок');
 
 // Класация
