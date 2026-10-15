@@ -20,6 +20,7 @@ const ACT = {
   },
   'Цветна осмица': async (p) => {
     const card = p.locator('.c8-in-hand:not([disabled])');
+    if (await p.locator('.c8-call').count() && Math.random() < 0.7) await p.locator('.c8-call').click();
     if (await card.count()) {
       await card.first().click();
       if (await p.locator('.c8-picker:not([hidden])').count()) await p.locator('.c8-swatch').first().click();

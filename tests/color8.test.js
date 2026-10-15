@@ -17,11 +17,11 @@ function rig(players, hands, topCard, drawPile = [id(3, 0), id(3, 1), id(3, 2), 
   return s;
 }
 
-test('раздаване: по 7 карти, 64 общо, първата карта е число', () => {
+test('раздаване: по 7 карти, 68 общо, първата карта е число', () => {
   for (const n of [2, 3, 6]) {
     const s = c8.init(`seed${n}`, [...'abcdef'].slice(0, n));
     const all = [...s.hands.flat(), ...s.draw, ...s.discard];
-    assert.equal(new Set(all).size, 64);
+    assert.equal(new Set(all).size, 68);
     assert.ok(s.hands.every((h) => h.length === 7));
     assert.match(card(s.discard[0]).kind, /^[1-79]$/);
   }
@@ -94,6 +94,26 @@ test('празно тесте: изхвърлените се разбърква�
   assert.equal(a.hands[0].length, 2);
 });
 
+test('+4: сменя цвета, следващият тегли 4 и пропуска', () => {
+  const s = rig(P3, [[64, id(0, 4), id(0, 5)], [id(0, 1)], [id(0, 2)]], id(1, 0), [...Array(10).keys()].map((k) => id(3, k % 8)));
+  assert.equal(c8.validateMove(s, { type: 'play', card: 64 }, 'a').reason, 'pick-color');
+  const r = c8.applyMove(s, { type: 'play', card: 64, color: 2, call: false }, 'a');
+  assert.equal(r.color, 2);
+  assert.equal(r.hands[1].length, 5);
+  assert.equal(r.turn, 2);
+});
+
+test('„Последна карта!“: без обявяване теглиш 2, с обявяване не', () => {
+  const pile = [id(3, 0), id(3, 1), id(3, 2), id(3, 3)];
+  const base = () => rig(P3, [[id(0, 3), id(0, 4)], [id(0, 1)], [id(0, 2)]], id(0, 0), pile);
+  const forgot = c8.applyMove(base(), { type: 'play', card: id(0, 3) }, 'a');
+  assert.equal(forgot.hands[0].length, 3);
+  assert.equal(forgot.last.penalty, 2);
+  const said = c8.applyMove(base(), { type: 'play', card: id(0, 3), call: true }, 'a');
+  assert.equal(said.hands[0].length, 1);
+  assert.equal(said.last.called, true);
+});
+
 test('първият без карти печели; класиране по брой карти', () => {
   const s = rig(P3, [[id(0, 3)], [id(0, 1), id(1, 1)], [id(0, 2)]], id(0, 0));
   const r = c8.applyMove(s, { type: 'play', card: id(0, 3) }, 'a');
@@ -117,5 +137,5 @@ test('цяла партида с 6 играчи и автоматични ход
   assert.equal(r.rejected.length, 0);
   assert.deepEqual(r.state, s);
   const all = [...r.state.hands.flat(), ...r.state.draw, ...r.state.discard];
-  assert.equal(new Set(all).size, 64, 'нито една карта не се губи');
+  assert.equal(new Set(all).size, 68, 'нито една карта не се губи');
 });
