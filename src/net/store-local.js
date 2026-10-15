@@ -48,7 +48,7 @@ export function createLocalStore({ me, storage = null, channel = null } = {}) {
 
   const emitPeers = (name) => {
     const now = Date.now();
-    const ids = [...(peers.get(name) ?? new Map())].filter(([, t]) => now - t < 6000).map(([id]) => id);
+    const ids = [...(peers.get(name) ?? new Map())].filter(([, t]) => now - t < 8000).map(([id]) => id);
     for (const cb of peerSubs.get(name) ?? []) cb(new Set(ids));
   };
 

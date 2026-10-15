@@ -33,6 +33,7 @@ export default {
   blurb: 'Пусни жетон и подреди четири.',
   minPlayers: 2,
   maxPlayers: 2,
+  moveSound: 'drop',
 
   init: (seed, players) => ({
     players: players.slice(),
@@ -108,7 +109,22 @@ export default {
     el.append(grid);
   },
 
+  // Мини изглед за картата в лобито: истинско разположение от партида.
+  art() {
+    const el = document.createElement('div');
+    el.className = 'c4-art';
+    const rows = ['....', '..1.', '.21.', '1221'];
+    for (const row of rows) for (const ch of row) {
+      const s = document.createElement('span');
+      if (ch !== '.') s.style.background = `var(--seat-${ch})`;
+      el.append(s);
+    }
+    return el;
+  },
+
   css: `
+.c4-art { display:grid; grid-template-columns:repeat(4,18px); gap:5px; padding:8px; background:var(--board); border-radius:12px; }
+.c4-art span { width:18px; height:18px; border-radius:50%; background:var(--board-hole); }
 .c4 { display:grid; grid-template-columns:repeat(7,1fr); gap:clamp(3px,1.2vw,8px);
   background:var(--board); padding:clamp(6px,2vw,12px); border-radius:var(--r-lg);
   width:min(100%,440px); margin-inline:auto; box-shadow:var(--shadow-pop); }

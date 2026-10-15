@@ -1,0 +1,263 @@
+<title>Мегдан</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700&family=Unbounded:wght@600;800&display=swap">
+<style>
+/* Мегдан: площадът, където се събират приятелите. Играчките са пластмасови фигурки:
+   плътни цветове, дебела сянка отдолу, натискат се надолу. Шевицата е само в марката.
+   Оформление: едноколонно приложение (телефон първо); на широк екран играта вляво, чатът вдясно. */
+:root {
+  --bg: #eef2ea;
+  --surface: #ffffff;
+  --surface-2: #e2e8dc;
+  --ink: #1b2333;
+  --ink-2: #4f5a72;
+  --line: #cfd7c6;
+  --accent: #d93226;
+  --accent-ink: #ffffff;
+  --sun: #f5b51f;
+  --focus: #2b66d9;
+  --ok: #1d855a;
+  --bad: #c42b20;
+  --seat-1: #d93226;
+  --seat-2: #2b66d9;
+  --seat-3: #e9a90f;
+  --seat-4: #1d9563;
+  --seat-5: #8550db;
+  --seat-6: #ea7316;
+  --board: #23407f;
+  --board-hole: #eef2ea;
+  --board-hole-hi: #ffffff;
+  --toy-shadow: rgb(27 35 51 / .22);
+  --shadow-pop: 0 6px 0 var(--toy-shadow);
+  --f-display: "Unbounded", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --f-body: "Onest", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r-pill: 999px;
+  --r-lg: 20px;
+  --r-md: 14px;
+  --step--1: .8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.6rem;
+  --step-3: 2.2rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121826; --surface: #1c2435; --surface-2: #263047; --ink: #eef1f7; --ink-2: #a3adc4;
+    --line: #34405a; --accent: #ff5545; --accent-ink: #1a0503; --sun: #ffc743; --focus: #86adff;
+    --ok: #45c48c; --bad: #ff6b5e;
+    --seat-1: #ff5545; --seat-2: #5b8dff; --seat-3: #ffc743; --seat-4: #3fc386; --seat-5: #a77dff; --seat-6: #ff9440;
+    --board: #2c4c9e; --board-hole: #0f1420; --board-hole-hi: #1f2840;
+    --toy-shadow: rgb(0 0 0 / .5); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121826; --surface: #1c2435; --surface-2: #263047; --ink: #eef1f7; --ink-2: #a3adc4;
+  --line: #34405a; --accent: #ff5545; --accent-ink: #1a0503; --sun: #ffc743; --focus: #86adff;
+  --ok: #45c48c; --bad: #ff6b5e;
+  --seat-1: #ff5545; --seat-2: #5b8dff; --seat-3: #ffc743; --seat-4: #3fc386; --seat-5: #a77dff; --seat-6: #ff9440;
+  --board: #2c4c9e; --board-hole: #0f1420; --board-hole-hi: #1f2840;
+  --toy-shadow: rgb(0 0 0 / .5); color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 var(--step-0)/1.5 var(--f-body);
+  -webkit-tap-highlight-color: transparent;
+}
+* { box-sizing: border-box; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 800; line-height: 1.15; margin: 0; text-wrap: balance; }
+h1 { font-size: var(--step-3); letter-spacing: -.02em; }
+h2 { font-size: var(--step-2); letter-spacing: -.01em; }
+h3 { font-size: var(--step-1); font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- рамка на приложението ---- */
+.app { min-height: 100%; display: flex; flex-direction: column; }
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.topbar-row { max-width: 1040px; margin-inline: auto; display: flex; align-items: center; gap: 12px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 4px 0; cursor: pointer; }
+.brand-word { font: 800 1.35rem/1 var(--f-display); letter-spacing: -.03em; }
+/* Шевица: кръстат бод в червено и жълто. Единственото „народно“ място. */
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 8px; flex: none;
+  background:
+    conic-gradient(from 45deg at 50% 50%, var(--accent) 0 25%, transparent 0 50%, var(--accent) 0 75%, transparent 0) 0 0 / 10px 10px,
+    var(--sun);
+  box-shadow: inset 0 0 0 3px var(--ink);
+}
+.stitch {
+  height: 8px;
+  background:
+    linear-gradient(135deg, var(--accent) 33%, transparent 34%) 0 0 / 16px 8px repeat-x,
+    linear-gradient(225deg, var(--accent) 33%, transparent 34%) 0 0 / 16px 8px repeat-x,
+    var(--sun);
+}
+.spacer { flex: 1; }
+.main {
+  flex: 1; width: 100%; max-width: 1040px; margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+/* ---- бутони-играчки ---- */
+.btn {
+  --b-bg: var(--surface); --b-fg: var(--ink); --b-edge: var(--toy-shadow);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 10px 20px; border-radius: var(--r-pill);
+  border: 2px solid var(--ink); background: var(--b-bg); color: var(--b-fg);
+  font: 700 var(--step-0)/1.1 var(--f-body); white-space: nowrap; cursor: pointer;
+  box-shadow: 0 4px 0 var(--ink);
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 0 var(--ink); }
+.btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 var(--ink); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn-primary { --b-bg: var(--accent); --b-fg: var(--accent-ink); }
+.btn-sun { --b-bg: var(--sun); --b-fg: #1b2333; }
+.btn-small { min-height: 40px; padding: 6px 14px; font-size: var(--step--1); box-shadow: 0 3px 0 var(--ink); }
+.btn-icon { width: 44px; min-height: 44px; padding: 0; font-size: 1.15rem; }
+.btn-quiet { border-color: transparent; box-shadow: none; background: transparent; }
+.btn-quiet:hover:not(:disabled) { box-shadow: none; background: var(--surface-2); }
+.btn-quiet:active:not(:disabled) { transform: none; }
+
+/* ---- полета ---- */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-weight: 700; font-size: var(--step--1); }
+.input {
+  min-height: 48px; padding: 10px 14px; border-radius: var(--r-md);
+  border: 2px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.input:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.hint { font-size: var(--step--1); color: var(--ink-2); }
+.error { font-size: var(--step--1); color: var(--bad); font-weight: 500; }
+
+/* ---- аватари ---- */
+.avatar {
+  --av: var(--seat-2);
+  width: 40px; height: 40px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; font-size: 1.3rem; line-height: 1;
+  background: color-mix(in srgb, var(--av) 22%, var(--surface));
+  box-shadow: inset 0 0 0 3px var(--av);
+}
+.avatar.lg { width: 72px; height: 72px; font-size: 2.3rem; box-shadow: inset 0 0 0 4px var(--av); }
+.avatar.sm { width: 30px; height: 30px; font-size: 1rem; box-shadow: inset 0 0 0 2px var(--av); }
+
+/* ---- профил ---- */
+.profile-card { display: flex; flex-direction: column; gap: 20px; max-width: 520px; width: 100%; margin-inline: auto; }
+.profile-preview { display: flex; align-items: center; gap: 16px; }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; }
+.choice {
+  aspect-ratio: 1; min-height: 48px; border-radius: var(--r-md); border: 2px solid var(--line);
+  background: var(--surface); font-size: 1.5rem; cursor: pointer; display: grid; place-items: center;
+}
+.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--surface-2); box-shadow: 0 3px 0 var(--ink); }
+.swatch { border-radius: 50%; background: var(--sw); border: 3px solid var(--surface); box-shadow: 0 0 0 2px var(--line); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--ink); }
+
+/* ---- лоби ---- */
+.lobby-hero { display: grid; gap: 16px; }
+.join-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+.code-input {
+  width: 9.5ch; min-height: 56px; text-align: center; letter-spacing: .3em; text-transform: uppercase;
+  font: 800 1.5rem/1 var(--f-display); padding-inline: 12px .7em;
+}
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 16px; }
+.game-tile {
+  display: grid; grid-template-rows: auto 1fr; text-align: left; padding: 0; overflow: hidden;
+  border: 2px solid var(--ink); border-radius: var(--r-lg); background: var(--surface); cursor: pointer;
+  box-shadow: 0 5px 0 var(--ink); transition: transform .08s ease, box-shadow .08s ease;
+}
+.game-tile:hover { transform: translateY(-2px); box-shadow: 0 7px 0 var(--ink); }
+.game-tile:active { transform: translateY(5px); box-shadow: 0 0 0 var(--ink); }
+.game-art { height: 112px; display: grid; place-items: center; background: var(--tile-bg, var(--surface-2)); border-bottom: 2px solid var(--ink); }
+.game-info { padding: 12px 14px 14px; display: grid; gap: 4px; }
+.game-info h3 { font-size: 1.05rem; }
+.game-meta { font-size: var(--step--1); color: var(--ink-2); }
+
+/* ---- стая ---- */
+.room { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .room { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } }
+.room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.room-code { font: 800 var(--step-2)/1 var(--f-display); letter-spacing: .12em; }
+.seats { display: flex; flex-wrap: wrap; gap: 8px; }
+.seat {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: var(--r-pill);
+  background: var(--surface); border: 2px solid var(--line); min-width: 0; max-width: 100%;
+}
+.seat.turn { border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.seat .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12ch; }
+.seat .sub { font-size: var(--step--1); color: var(--ink-2); }
+.seat.away { opacity: .55; }
+.badge { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill); background: var(--surface-2); }
+.badge.ok { background: color-mix(in srgb, var(--ok) 20%, var(--surface)); color: var(--ok); }
+.stage { display: grid; gap: 14px; min-width: 0; }
+.board-wrap { display: grid; justify-items: center; min-width: 0; }
+.disc-dot { width: 16px; height: 16px; flex: none; border-radius: 50%; background: var(--disc); box-shadow: inset 0 -3px 0 rgb(0 0 0 / .2); }
+.status-line { display: flex; align-items: center; gap: 10px; min-height: 40px; font-weight: 700; font-size: var(--step-1); }
+.timer { margin-left: auto; font: 600 var(--step-0)/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.timer.low { color: var(--bad); }
+.panel { background: var(--surface); border: 2px solid var(--line); border-radius: var(--r-lg); padding: 16px; display: grid; gap: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ---- чат ---- */
+.chat { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 10px; max-height: 70vh; }
+.chat-log { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; min-height: 120px; max-height: 40vh; padding-right: 4px; }
+.msg { display: flex; gap: 8px; align-items: flex-start; }
+.msg .bubble { background: var(--surface-2); padding: 6px 10px; border-radius: 14px; overflow-wrap: anywhere; min-width: 0; }
+.msg .who { font-size: .75rem; font-weight: 700; color: var(--ink-2); }
+.msg.big .bubble { background: none; font-size: 1.8rem; padding: 0 4px; }
+.reactions { display: flex; gap: 6px; flex-wrap: wrap; }
+.reactions button { font-size: 1.3rem; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); cursor: pointer; }
+.chat-form { display: flex; gap: 8px; }
+.chat-form .input { flex: 1; min-width: 0; }
+.float-emoji { position: fixed; z-index: 30; font-size: 2.4rem; pointer-events: none; animation: floatUp 1.6s ease-out forwards; }
+@keyframes floatUp { to { transform: translateY(-40vh) scale(1.3); opacity: 0; } }
+
+/* ---- известия ---- */
+.toast-wrap {
+  position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; display: grid; justify-items: center; gap: 8px; pointer-events: none;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.toast {
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: var(--r-pill); font-weight: 700;
+  max-width: 100%; animation: toastIn .2s ease-out; pointer-events: auto;
+}
+@keyframes toastIn { from { transform: translateY(12px); opacity: 0; } }
+.result-banner {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-lg);
+  background: var(--sun); color: #1b2333; border: 2px solid var(--ink); box-shadow: 0 5px 0 var(--ink);
+}
+.result-banner h2 { font-size: var(--step-1); }
+.empty { padding: 24px; text-align: center; color: var(--ink-2); display: grid; gap: 10px; justify-items: center; }
+
+/* ---- класация ---- */
+.board-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.board-table th { text-align: left; font-size: var(--step--1); color: var(--ink-2); font-weight: 500; padding: 6px 8px; }
+.board-table td { padding: 10px 8px; border-top: 2px solid var(--line); }
+.board-table .r { text-align: right; }
+.table-wrap { overflow-x: auto; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+<div id="app" class="app">
+  <noscript>Мегдан има нужда от JavaScript.</noscript>
+</div>
+<script type="module" src="src/app.js"></script>
