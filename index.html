@@ -254,6 +254,143 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .board-table .r { text-align: right; }
 .table-wrap { overflow-x: auto; }
 
+/* ---- навигация ---- */
+a.brand { text-decoration: none; color: inherit; }
+.nav-top { display: none; gap: 4px; margin-left: 12px; }
+.nav-top-item, .nav-bottom-item { position: relative; text-decoration: none; color: var(--ink-2); font-weight: 700; }
+.nav-top-item { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: var(--r-pill); }
+.nav-top-item:hover { background: var(--surface-2); color: var(--ink); }
+.nav-top-item[aria-current="page"] { background: var(--ink); color: var(--bg); }
+.nav-icon { display: inline-grid; place-items: center; font-size: 1.15rem; line-height: 1; }
+.nav-badge {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink);
+  font-size: .75rem; font-weight: 800; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums;
+}
+.nav-bottom {
+  position: fixed; z-index: 15; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--surface); border-top: 2px solid var(--ink);
+  padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+}
+.nav-bottom-item { display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border-radius: var(--r-md); font-size: .75rem; min-height: 48px; }
+.nav-bottom-item[aria-current="page"] { color: var(--ink); background: var(--surface-2); }
+.nav-bottom-item .nav-badge { position: absolute; top: 2px; left: calc(50% + 6px); }
+.nav-top-item .nav-badge { margin-left: 2px; }
+body.first-run .nav-bottom, body.first-run .nav-top { display: none; }
+@media (max-width: 719px) {
+  .main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .toast-wrap { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  body.in-room .toast-wrap { padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (min-width: 720px) {
+  .nav-top { display: flex; }
+  .nav-bottom { display: none; }
+}
+.avatar.xs { width: 24px; height: 24px; font-size: .8rem; box-shadow: inset 0 0 0 2px var(--av); }
+
+/* ---- лист (диалог) ---- */
+.sheet {
+  border: 2px solid var(--ink); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 0; margin: auto auto 0;
+  width: 100%; max-width: 560px; max-height: 88vh; background: var(--surface); color: var(--ink);
+  box-shadow: 0 -6px 0 var(--toy-shadow);
+}
+.sheet::backdrop { background: rgb(18 24 38 / .45); }
+.sheet[open] { animation: sheetUp .22s ease-out; }
+@keyframes sheetUp { from { transform: translateY(40px); opacity: .5; } }
+@media (min-width: 720px) { .sheet { margin: auto; border-radius: var(--r-lg); box-shadow: 0 8px 0 var(--ink); } }
+.sheet-inner { display: grid; gap: 14px; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet-head { display: flex; align-items: center; gap: 10px; }
+.sheet-head h2 { flex: 1; }
+.sheet-body { display: grid; gap: 12px; min-width: 0; }
+.sheet-body h3 { font-size: 1rem; }
+.sheet-game { display: flex; gap: 14px; align-items: center; }
+.sheet-art { height: auto; padding: 10px; border: 2px solid var(--ink); border-radius: var(--r-md); flex: none; }
+.rules { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 60ch; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  min-height: 40px; padding: 6px 14px; border-radius: var(--r-pill); border: 2px solid var(--ink); background: var(--surface);
+  font-weight: 700; cursor: pointer;
+}
+.pill[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.picker-list { display: grid; gap: 8px; }
+.picker-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px;
+  border-radius: var(--r-md); border: 2px solid var(--line); background: var(--surface); text-align: left; cursor: pointer;
+}
+.picker-item[aria-pressed="true"] { border-color: var(--ink); background: var(--surface-2); }
+.picker-name { font-weight: 700; }
+.field-label { font-weight: 700; font-size: var(--step--1); }
+
+/* ---- стая: дъската първо ---- */
+.room-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.code-chip {
+  display: inline-grid; justify-items: start; gap: 0; padding: 4px 14px 6px; border-radius: var(--r-md);
+  border: 2px solid var(--ink); background: var(--sun); color: #1b2333; cursor: pointer; box-shadow: 0 3px 0 var(--ink);
+}
+.code-chip:active { transform: translateY(3px); box-shadow: none; }
+.code-chip-label { font-size: .7rem; font-weight: 700; }
+.code-chip-code { font: 800 1.15rem/1 var(--f-display); letter-spacing: .14em; }
+.room-bar { flex-wrap: nowrap; }
+.room-game { flex: 1 1 0; font-weight: 700; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-bar .btn-small { padding-inline: 10px; flex: none; }
+.seats-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.seats-row .seat { flex: none; }
+.status-line.mine { color: var(--accent); }
+.board-actions { justify-content: center; }
+.setup-game { display: flex; gap: 14px; align-items: center; }
+.setup-art { height: auto; padding: 10px; border: 2px solid var(--ink); border-radius: var(--r-md); flex: none; }
+.chat-head { display: flex; align-items: center; justify-content: space-between; }
+.chat-close { display: none; }
+.chat-fab { display: none; }
+.invite-fallback { user-select: all; background: var(--surface); padding: 8px 12px; border-radius: var(--r-md); border: 2px dashed var(--line); }
+@media (max-width: 899px) {
+  .chat-sheet {
+    position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; max-height: 78vh; border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border: 2px solid var(--ink); transform: translateY(105%); transition: transform .22s ease-out; visibility: hidden;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .chat-sheet.open { transform: none; visibility: visible; box-shadow: 0 -6px 0 var(--toy-shadow); }
+  .chat-close { display: inline-flex; }
+  .chat-fab {
+    display: inline-flex; align-items: center; gap: 6px; position: fixed; z-index: 16;
+    right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    min-height: 48px; padding: 8px 16px; border-radius: var(--r-pill); border: 2px solid var(--ink);
+    background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer;
+  }
+  .chat-fab[aria-expanded="true"] { visibility: hidden; }
+}
+@media (min-width: 720px) and (max-width: 899px) { .chat-fab { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); } }
+.fab-count {
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink);
+  font-size: .75rem; font-weight: 800; display: inline-grid; place-items: center;
+}
+
+/* ---- моите стаи ---- */
+.room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.room-list li { position: relative; }
+.room-card {
+  width: 100%; display: flex; gap: 14px; align-items: center; padding: 12px 52px 12px 12px; text-align: left; cursor: pointer;
+  border: 2px solid var(--line); border-radius: var(--r-lg); background: var(--surface);
+}
+.room-card.hot { border-color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+.room-card:disabled { opacity: .6; cursor: default; }
+.room-card-art { flex: none; width: 72px; height: 72px; display: grid; place-items: center; overflow: hidden; border-radius: var(--r-md); background: var(--surface-2); }
+.room-card-art > * { transform: scale(.6); }
+.room-card-info { display: grid; gap: 6px; min-width: 0; }
+.room-card-top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.room-card-name { font-weight: 800; font-family: var(--f-display); font-size: 1rem; }
+.room-card-code { font-weight: 700; color: var(--ink-2); letter-spacing: .12em; font-size: var(--step--1); }
+.room-card-people { display: flex; gap: 4px; }
+.room-card-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+.chip { justify-self: start; font-size: var(--step--1); font-weight: 700; padding: 2px 10px; border-radius: var(--r-pill); background: var(--surface-2); }
+.chip.hot { background: var(--accent); color: var(--accent-ink); }
+.turn-banner {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--r-lg); border: 2px solid var(--ink);
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; text-align: left; cursor: pointer; box-shadow: 0 4px 0 var(--ink);
+}
+.turn-banner-count { font: 800 1.4rem/1 var(--f-display); }
+.turn-banner-go { margin-left: auto; text-decoration: underline; white-space: nowrap; }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

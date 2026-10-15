@@ -4,8 +4,9 @@ import { h, mount, storageGet } from './dom.js';
 import { sound } from './sound.js';
 import { GAMES, playersLabel } from '../games/index.js';
 import { normalizeCode } from '../net/api.js';
+import { openGameSheet } from './sheet.js';
 
-export function renderLobby(root, { profile, onJoin, onCreate }) {
+export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, onCreate }) {
   const err = h('p', { class: 'error', id: 'code-error', hidden: true });
   const codeInput = h('input', {
     class: 'input code-input', id: 'code', inputMode: 'text', autocomplete: 'off', autocapitalize: 'characters',
@@ -28,12 +29,13 @@ export function renderLobby(root, { profile, onJoin, onCreate }) {
       const code = normalizeCode(codeInput.value);
       if (code.length !== 4) return showError('Кодът е от 4 букви.');
       joinBtn.disabled = true;
-      const res = await onJoin(code).catch(() => ({ ok: false, reason: 'error' }));
+      const res = await onJoin(code).catch((e2) => ({ ok: false, reason: e2?.code === 'invalid_argument' ? 'no-write' : 'error' }));
       joinBtn.disabled = false;
       if (!res.ok) {
         showError({
           'not-found': `Няма стая с код ${code}. Провери буквите.`,
           full: 'Стаята е пълна (6 души).',
+          'no-write': 'Нямаш права да играеш тук. Помоли собственика да те покани с право „Can edit“.',
         }[res.reason] ?? 'Не успях да вляза. Опитай пак.');
       }
     },
@@ -53,8 +55,8 @@ export function renderLobby(root, { profile, onJoin, onCreate }) {
 
   const tiles = GAMES.map((g, i) => h('button', {
     class: 'game-tile', type: 'button', '--tile-bg': `color-mix(in srgb, var(--seat-${(i % 6) + 1}) 18%, var(--surface))`,
-    onClick: () => { sound.tap(); onCreate(g.id); },
-    'aria-label': `${g.name}, ${playersLabel(g)}. Създай стая`,
+    onClick: () => { sound.tap(); openGameSheet(g, { onCreate }); },
+    'aria-label': `${g.name}, ${playersLabel(g)}. Правила и нова стая`,
   },
     h('div', { class: 'game-art' }, g.art ? g.art() : g.icon),
     h('div', { class: 'game-info' },
@@ -67,6 +69,11 @@ export function renderLobby(root, { profile, onJoin, onCreate }) {
   mount(root,
     h('section', { class: 'lobby-hero' },
       h('h1', { text: `Здравей, ${profile.nick}!` }),
+      myTurnCount > 0 && h('button', { class: 'turn-banner', type: 'button', onClick: onRooms },
+        h('span', { class: 'turn-banner-count num', text: String(myTurnCount) }),
+        h('span', { text: myTurnCount === 1 ? 'Чакат те в една стая. Твой ход е.' : `Твой ход е в ${myTurnCount} стаи.` }),
+        h('span', { class: 'turn-banner-go', text: 'Към стаите' }),
+      ),
       h('div', { class: 'room', style: { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' } },
         joinForm,
         h('div', { class: 'panel' },
@@ -75,7 +82,7 @@ export function renderLobby(root, { profile, onJoin, onCreate }) {
           h('div', { class: 'actions' },
             h('button', { class: 'btn btn-sun', type: 'button', text: 'Бърза игра', onClick: quick }),
           ),
-          h('p', { class: 'hint', text: 'Бърза игра избира игра вместо теб. Или избери долу.' }),
+          h('p', { class: 'hint', text: 'Бърза игра избира игра вместо теб. Или избери долу, за да видиш правилата.' }),
         ),
       ),
     ),

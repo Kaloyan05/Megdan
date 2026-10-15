@@ -104,6 +104,18 @@ test('стая: създай, влез с код, готовност, старт
     await tick();
     assert.equal(vb.get().room.hostId, 'bob');
 
+    // Моите стаи: Али излезе → няма я в списъка му; Боби я има.
+    assert.deepEqual((await b.store.get('data/users/bob/myrooms')).rooms.map((r) => r.code), [code]);
+    assert.deepEqual((await a.store.get('data/users/alice/myrooms')).rooms, []);
+
+    // Лек наблюдател вижда стаята и ходовете от текущия рунд.
+    let lite = null;
+    const offLite = b.watchRoomLite(code, (x) => { lite = x; });
+    await tick();
+    assert.equal(lite.room.round, 2);
+    assert.deepEqual(lite.log, []);
+    offLite();
+
     va.off(); vb.off();
   } finally {
     close();

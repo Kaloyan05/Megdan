@@ -49,7 +49,10 @@ async function playGame(name, n, tag) {
   }
   const [host, ...guests] = pages;
   await host.getByRole('button', { name: new RegExp(name) }).click();
-  const code = (await host.locator('.room-code').textContent()).trim();
+  if (tag === 'c8') { await host.waitForTimeout(300); await host.screenshot({ path: `${out}/${tag}-sheet.png` }); }
+  await host.getByRole('button', { name: 'Създай стая' }).click();
+  await host.locator('.code-chip-code').waitFor();
+  const code = (await host.locator('.code-chip-code').textContent()).trim();
   for (const g of guests) {
     await g.fill('#code', code);
     await g.getByRole('button', { name: 'Влез', exact: true }).click();

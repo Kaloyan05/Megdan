@@ -1,8 +1,9 @@
 // Входна точка: избира store, зарежда профила и превключва екраните по #хеш.
-//   (празно)  → лоби
-//   #ABCD     → стая с код ABCD
-//   #profil   → профил
+//   (празно)   → игри (лоби)
+//   #stai      → моите стаи
+//   #ABCD      → стая с код ABCD
 //   #klasaciya → класация
+//   #profil    → профил
 
 import { openStore } from './net/store.js';
 import { createApi, normalizeCode } from './net/api.js';
@@ -11,16 +12,58 @@ import { sound } from './ui/sound.js';
 import { renderProfile } from './ui/profile.js';
 import { renderLobby } from './ui/lobby.js';
 import { renderRoom } from './ui/room.js';
+import { renderRooms } from './ui/rooms.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
+import { createTurnWatcher } from './ui/turns.js';
 import { injectGameCss } from './games/index.js';
 
+const NO_WRITE = 'Нямаш права да играеш тук. Помоли собственика да те покани с право „Can edit“.';
 const appEl = document.getElementById('app');
 const main = h('main', { class: 'main', id: 'main' });
 let api = null;
 let profile = null;
 let cleanup = null;
+let turns = null;
+let currentRoom = null;
+let myTurnCount = 0;
+
+const NAV = [
+  { id: 'igri', hash: '', label: 'Игри', icon: '🎲' },
+  { id: 'stai', hash: 'stai', label: 'Стаи', icon: '🚪' },
+  { id: 'klasaciya', hash: 'klasaciya', label: 'Класация', icon: '🏆' },
+  { id: 'profil', hash: 'profil', label: 'Профил', icon: null },
+];
+const navEls = []; // { item, el, badge, avatarSlot }
 
 const go = (hash) => { if (location.hash.slice(1) !== hash) location.hash = hash; else route(); };
+
+function navSection(hash) {
+  if (hash === 'profil') return 'profil';
+  if (hash === 'klasaciya') return 'klasaciya';
+  if (hash === 'stai' || normalizeCode(hash).length === 4) return 'stai';
+  return 'igri';
+}
+
+function paintNav() {
+  const section = navSection(decodeURIComponent(location.hash.slice(1)));
+  for (const n of navEls) {
+    if (n.item.id === section) n.el.setAttribute('aria-current', 'page'); else n.el.removeAttribute('aria-current');
+    if (n.badge) { n.badge.hidden = !myTurnCount; n.badge.textContent = String(myTurnCount); }
+    if (n.avatarSlot) mount(n.avatarSlot, avatarEl(profile, 'xs'));
+  }
+}
+
+function navItem(item, cls) {
+  const badge = item.id === 'stai' ? h('span', { class: 'nav-badge', hidden: true, 'aria-label': 'стаи, в които си на ход' }) : null;
+  const avatarSlot = item.icon ? null : h('span', { class: 'nav-icon' });
+  const el = h('a', { class: cls, href: `#${item.hash}`, onClick: (e) => { e.preventDefault(); go(item.hash); } },
+    avatarSlot ?? h('span', { class: 'nav-icon', 'aria-hidden': 'true', text: item.icon }),
+    h('span', { class: 'nav-label', text: item.label }),
+    badge,
+  );
+  navEls.push({ item, el, badge, avatarSlot });
+  return el;
+}
 
 function topbar() {
   const muteBtn = h('button', { class: 'btn btn-icon btn-quiet', type: 'button' });
@@ -33,53 +76,54 @@ function topbar() {
   sound.onChange(paintMute);
   paintMute();
 
-  const me = h('button', { class: 'btn btn-icon btn-quiet', type: 'button', 'aria-label': 'Профил', onClick: () => go('profil') });
-  const paintMe = () => mount(me, avatarEl(profile, 'sm'));
-  paintMe();
-  topbar.paintMe = paintMe;
-
   return h('header', { class: 'topbar' },
     h('div', { class: 'topbar-row' },
-      h('button', { class: 'brand', type: 'button', 'aria-label': 'Мегдан, към лобито', onClick: () => go('') },
+      h('a', { class: 'brand', href: '#', 'aria-label': 'Мегдан, към игрите', onClick: (e) => { e.preventDefault(); go(''); } },
         h('span', { class: 'brand-mark', 'aria-hidden': 'true' }),
         h('span', { class: 'brand-word', text: 'мегдан' }),
       ),
+      h('nav', { class: 'nav-top', 'aria-label': 'Основно меню' }, NAV.map((n) => navItem(n, 'nav-top-item'))),
       h('div', { class: 'spacer' }),
-      h('button', { class: 'btn btn-small btn-quiet', type: 'button', text: 'Класация', onClick: () => go('klasaciya') }),
       muteBtn,
-      me,
     ),
     h('div', { class: 'stitch', 'aria-hidden': 'true' }),
   );
 }
 
+function bottomNav() {
+  return h('nav', { class: 'nav-bottom', 'aria-label': 'Основно меню' }, NAV.map((n) => navItem(n, 'nav-bottom-item')));
+}
+
 async function route() {
   cleanup?.();
   cleanup = null;
+  currentRoom = null;
   const hash = decodeURIComponent(location.hash.slice(1));
   window.scrollTo(0, 0);
+  paintNav();
+  document.body.classList.toggle('in-room', normalizeCode(hash).length === 4 && hash.length === 4);
 
   if (!profile || hash === 'profil') {
     const firstTime = !profile;
+    document.body.classList.toggle('first-run', firstTime);
     renderProfile(main, {
       initial: profile, firstTime,
       onSave: async (p) => {
         profile = p;
         storageSet(`profile:${api.me}`, p);
-        topbar.paintMe?.();
+        document.body.classList.remove('first-run');
+        paintNav();
         api.saveProfile(p).catch(() => toast('Профилът е запазен само на това устройство.'));
         sound.tap();
-        go(firstTime && /^[A-Z]{4}$/.test(normalizeCode(hash)) && hash.length === 4 ? hash : '');
+        go(firstTime && hash.length === 4 && normalizeCode(hash).length === 4 ? hash : '');
       },
-      onCancel: () => history.length > 1 ? history.back() : go(''),
+      onCancel: () => (history.length > 1 ? history.back() : go('')),
     });
     return;
   }
 
-  if (hash === 'klasaciya') {
-    cleanup = renderLeaderboard(main, { api });
-    return;
-  }
+  if (hash === 'klasaciya') { cleanup = renderLeaderboard(main, { api }); return; }
+  if (hash === 'stai') { cleanup = renderRooms(main, { api, turns, go }); return; }
 
   const code = normalizeCode(hash);
   if (hash && code.length === 4) {
@@ -89,30 +133,31 @@ async function route() {
       toast({
         'not-found': `Няма стая с код ${code}.`,
         full: 'Стаята е пълна (6 души).',
-        'no-write': 'Нямаш права да играеш тук. Помоли собственика да те покани като Editor.',
+        'no-write': NO_WRITE,
       }[res.reason] ?? 'Не успях да вляза. Опитай пак.', 4000);
       go('');
       return;
     }
-    cleanup = renderRoom(main, { api, code, onLeave: () => go('') });
+    currentRoom = code;
+    cleanup = renderRoom(main, { api, code, onLeave: () => go('stai') });
     return;
   }
 
   renderLobby(main, {
     profile,
+    myTurnCount,
+    onRooms: () => go('stai'),
     onJoin: async (c) => {
       const res = await api.joinRoom(c, profile);
       if (res.ok) go(c);
       return res;
     },
-    onCreate: async (gameId) => {
+    onCreate: async (gameId, timerSec = 0) => {
       try {
-        const c = await api.createRoom({ gameId, profile });
+        const c = await api.createRoom({ gameId, timerSec, profile });
         go(c);
       } catch (e) {
-        toast(e?.code === 'invalid_argument'
-          ? 'Нямаш права да създаваш стаи. Помоли собственика да те покани като Editor.'
-          : 'Не успях да създам стая. Опитай пак.', 4000);
+        toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да създам стая. Опитай пак.', 4000);
       }
     },
   });
@@ -127,7 +172,7 @@ async function boot() {
       h('div', { class: 'empty' },
         h('h1', { text: 'Мегдан' }),
         h('p', { text: 'За да играеш, трябва да си влязъл в claude.ai и да имаш покана за тази страница.' }),
-        h('p', { class: 'muted', text: 'Помоли този, който ти прати линка, да те добави като Editor.' }),
+        h('p', { class: 'muted', text: 'Помоли този, който ти прати линка, да те покани с право „Can edit“.' }),
       ),
     ));
     return;
@@ -135,9 +180,21 @@ async function boot() {
   api = createApi(store);
   profile = (await api.getProfile().catch(() => null)) ?? storageGet(`profile:${api.me}`);
   if (profile && !storageGet(`profile:${api.me}`)) storageSet(`profile:${api.me}`, profile);
-  if (store.canWrite === false) toast('Можеш само да гледаш. За да играеш, трябва покана като Editor.', 5000);
+  if (store.canWrite === false) toast('Можеш само да гледаш. За да играеш, трябва покана с право „Can edit“.', 5000);
 
-  mount(appEl, topbar(), main);
+  turns = createTurnWatcher(api);
+  turns.subscribe((list) => {
+    myTurnCount = list.filter((s) => s.myTurn).length;
+    paintNav();
+  });
+  turns.onTurn((s) => {
+    if (s.code === currentRoom) return; // стаята сама известява
+    sound.turn();
+    try { navigator.vibrate?.(80); } catch { /* няма вибрация */ }
+    toast(`Твой ход: ${s.game?.name ?? 'стая'} ${s.code}`, 4000);
+  });
+
+  mount(appEl, topbar(), main, bottomNav());
   window.addEventListener('hashchange', route);
   route();
 }

@@ -30,15 +30,16 @@ await setProfile(p1, 'Калоян', 0);
 await p1.screenshot({ path: `${out}/02-lobby.png`, fullPage: true });
 
 await p1.getByRole('button', { name: /Четири в редица/ }).click();
-await p1.locator('.room-code').waitFor();
-const code = (await p1.locator('.room-code').textContent()).trim();
+await p1.getByRole('button', { name: 'Създай стая' }).click();
+await p1.locator('.code-chip-code').waitFor();
+const code = (await p1.locator('.code-chip-code').textContent()).trim();
 console.log('код:', code);
 
 await p2.goto(`${BASE}?store=local&as=p2`);
 await setProfile(p2, 'Мила', 3);
 await p2.fill('#code', code.toLowerCase());
 await p2.getByRole('button', { name: 'Влез', exact: true }).click();
-await p2.locator('.room-code').waitFor();
+await p2.locator('.code-chip-code').waitFor();
 await p2.getByRole('button', { name: 'Готов', exact: true }).click();
 
 await p1.getByRole('button', { name: 'Старт' }).waitFor();
@@ -65,24 +66,34 @@ await p2.getByRole('heading', { name: 'Загуба' }).waitFor();
 await p1.waitForTimeout(400);
 await p1.screenshot({ path: `${out}/05-win.png`, fullPage: true });
 
-// Чат и реакция
+// Чат: на телефон е панел зад бутон; другият вижда брояч.
+await p2.locator('.chat-fab').click();
 await p2.fill('#chat-text', 'Добра игра!');
 await p2.getByRole('button', { name: 'Прати' }).click();
-await p1.getByText('Добра игра!').waitFor();
+await p1.locator('.chat-log').getByText('Добра игра!').waitFor({ state: 'attached' });
+console.log('брояч на непрочетени:', await p1.locator('.fab-count').textContent());
+await p2.screenshot({ path: `${out}/05b-chat-open.png` });
+await p2.getByRole('button', { name: 'Скрий чата' }).click();
 
 // Реванш
-await p2.getByRole('button', { name: 'Готов', exact: true }).click();
-await p1.getByRole('button', { name: 'Нова партида' }).click();
+await p2.getByRole('button', { name: 'Реванш', exact: true }).click();
+await p1.getByRole('button', { name: 'Реванш', exact: true }).click();
 await p2.locator('.status-line', { hasText: /Твой ход|Ход на Калоян/ }).waitFor();
 
 // Презареждане по средата
 await p2.reload();
-await p2.locator('.room-code').waitFor();
+await p2.locator('.code-chip-code').waitFor();
 await p2.locator('.status-line', { hasText: /Твой ход|Ход на Калоян/ }).waitFor();
 console.log('презареждане: ок');
 
+// Моите стаи: стаята е там; Калоян или Мила е на ход.
+await p1.locator('.nav-bottom-item', { hasText: 'Стаи' }).click();
+await p1.locator('.room-card').first().waitFor();
+console.log('моите стаи:', (await p1.locator('.room-card').first().innerText()).replace(/\n/g, ' | '));
+await p1.screenshot({ path: `${out}/05c-rooms.png`, fullPage: true });
+
 // Класация
-await p1.getByRole('button', { name: 'Класация' }).click();
+await p1.locator('.nav-bottom-item', { hasText: 'Класация' }).click();
 await p1.getByRole('cell', { name: '1016' }).waitFor();
 await p1.screenshot({ path: `${out}/06-leaderboard.png`, fullPage: true });
 
@@ -93,6 +104,11 @@ dp.on('pageerror', (e) => errors.push(`dark pageerror: ${e.message}`));
 await dp.goto(`${BASE}?store=local&as=p3`);
 await setProfile(dp, 'Иво', 5);
 await dp.screenshot({ path: `${out}/07-lobby-dark-desktop.png` });
+await dp.getByRole('button', { name: /Реверси/ }).click();
+await dp.getByRole('button', { name: 'Създай стая' }).click();
+await dp.locator('.code-chip-code').waitFor();
+await dp.waitForTimeout(300);
+await dp.screenshot({ path: `${out}/08-room-dark-desktop.png` });
 
 await browser.close();
 console.log(errors.length ? `ГРЕШКИ:\n${errors.join('\n')}` : 'без грешки в конзолата');

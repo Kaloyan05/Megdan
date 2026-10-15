@@ -15,6 +15,7 @@ export const ROOM_CAP = 6;
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const CHAT_KEEP = 30;
 const PLAYED_KEEP = 40;
+const MY_ROOMS_KEEP = 12;
 
 // Кирилица със същия вид → латиница, за да работи въвеждане от българска клавиатура.
 const LOOKALIKE = { А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', Х: 'X', У: 'Y' };
@@ -39,6 +40,7 @@ export const activeMembers = (members) =>
 export function createApi(store, { now = () => Date.now(), rand = Math.random } = {}) {
   const me = store.me;
   const roomPath = (code) => `rooms/${code}`;
+  const myRoomsPath = `data/users/${me}/myrooms`;
   const ownMoves = new Map(); // `${code}:${round}` → масив от мои ходове
 
   const api = {
@@ -79,13 +81,48 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
         avatar: profile?.avatar ?? '🙂',
         color: profile?.color ?? 1,
       });
+      api.addMyRoom(code).catch(() => {});
       return { ok: true, room };
+    },
+
+    // ---- моите стаи: личен списък в data/users/{me} (никой друг не го вижда) ----
+    async addMyRoom(code) {
+      const cur = (await store.get(myRoomsPath))?.rooms ?? [];
+      const rooms = [{ code, at: now() }, ...cur.filter((r) => r.code !== code)].slice(0, MY_ROOMS_KEEP);
+      await store.set(myRoomsPath, { rooms });
+    },
+    async removeMyRoom(code) {
+      const cur = (await store.get(myRoomsPath))?.rooms ?? [];
+      await store.set(myRoomsPath, { rooms: cur.filter((r) => r.code !== code) });
+    },
+    watchMyRooms: (cb) => store.watchDoc(myRoomsPath, (d) => cb(d?.rooms ?? [])),
+
+    // Лек наблюдател: само документът на стаята и ходовете от текущия рунд.
+    watchRoomLite(code, cb) {
+      let room, log = [], round = null, offRound = null;
+      const emit = () => { if (room !== undefined) cb({ room, log }); };
+      const offRoom = store.watchDoc(roomPath(code), (r) => {
+        room = r;
+        const next = r && r.status !== 'lobby' ? r.round : null;
+        if (next !== round) {
+          offRound?.(); offRound = null; log = []; round = next;
+          if (next) {
+            offRound = store.watchCol(`${roomPath(code)}/r${next}`, (docs) => {
+              log = docs.flatMap((d) => (d.data?.moves ?? []).map((x) => ({ ...x, p: d.id })));
+              emit();
+            });
+          }
+        }
+        emit();
+      });
+      return () => { offRoom(); offRound?.(); };
     },
 
     async leaveRoom(code, room, members) {
       const path = `${roomPath(code)}/members/${me}`;
       const cur = members.find((m) => m.id === me);
       if (cur) await store.set(path, { ...cur.data, left: true, readyFor: 0 });
+      api.removeMyRoom(code).catch(() => {});
       if (room.hostId === me) {
         const host = nextHost(activeMembers(members).map((m) => ({ id: m.id, joinedAt: m.data.joinedAt })), me);
         if (host) await store.update(roomPath(code), { hostId: host });
@@ -105,9 +142,10 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     setTimer: (code, timerSec) => store.update(roomPath(code), { timerSec }),
 
     // Домакинът стартира: играчите са присъстващите, готови членове по ред на влизане.
-    async startGame(code, room, members, game) {
+    // players: изричен списък (реванш); иначе домакинът + готовите.
+    async startGame(code, room, members, game, chosen = null) {
       if (room.hostId !== me) return { ok: false, reason: 'not-host' };
-      const ready = activeMembers(members).filter((m) => m.id === me || m.data.readyFor === room.round + 1);
+      const ready = activeMembers(members).filter((m) => (chosen ? chosen.includes(m.id) : m.id === me || m.data.readyFor === room.round + 1));
       const players = ready.map((m) => m.id);
       if (players.length < game.minPlayers) return { ok: false, reason: 'too-few' };
       if (players.length > game.maxPlayers) return { ok: false, reason: 'too-many' };
