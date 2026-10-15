@@ -10,8 +10,9 @@ import memory from './memory.js';
 import ludo from './ludo.js';
 import tabla from './tabla.js';
 import battleship from './battleship.js';
+import golf from './golf.js';
 
-export const GAMES = [connect4, reversi, dots, color8, uttt, dice, memory, ludo, tabla, battleship];
+export const GAMES = [connect4, reversi, dots, color8, uttt, dice, memory, ludo, tabla, battleship, golf];
 export const gameById = (id) => GAMES.find((g) => g.id === id) ?? null;
 
 let injected = false;

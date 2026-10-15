@@ -66,6 +66,23 @@ const ACT = {
     const cells = p.locator('button.bs-cell:not([disabled])');
     await cells.nth(Math.floor(Math.random() * (await cells.count()))).click();
   },
+  'Мини голф': async (p) => {
+    if (Math.random() < 0.5) {
+      // прашка: от топката назад
+      const ball = p.locator('.gf-ball.now');
+      const box = await ball.boundingBox();
+      if (box) {
+        const x = box.x + box.width / 2, y = box.y + box.height / 2;
+        await p.mouse.move(x, y);
+        await p.mouse.down();
+        await p.mouse.move(x + (Math.random() - 0.5) * 30, y + 25 + Math.random() * 40, { steps: 4 });
+        await p.mouse.up();
+        return;
+      }
+    }
+    await p.locator('#gf-power').evaluate((el) => { el.value = String(15 + Math.floor(Math.random() * 50)); el.dispatchEvent(new Event('input')); });
+    await p.getByRole('button', { name: 'Удари' }).click();
+  },
   'Мемори': async (p) => {
     const cards = p.locator('.mm-card:not([disabled])');
     await cards.nth(Math.floor(Math.random() * (await cards.count()))).click();
@@ -118,7 +135,7 @@ async function playGame(name, n, tag) {
     if (await host.locator('.result-banner').count()) break;
     let acted = false;
     for (const p of pages) {
-      if ((await p.locator('.status-line').textContent().catch(() => '')).includes('Твой ход')) {
+      if (/Твой (ход|удар)/.test(await p.locator('.status-line').textContent().catch(() => ''))) {
         await ACT[name](p).catch(() => {});
         acted = true; moves++;
         if (moves === 6 && !shot) { shot = true; await p.waitForTimeout(300); await p.screenshot({ path: `${out}/${tag}-play.png`, fullPage: true }); }
@@ -142,7 +159,7 @@ async function playGame(name, n, tag) {
 const ALL = [
   ['Четири в редица', 2, 'c4'], ['Реверси', 2, 'rv'], ['Точки и кутийки', 3, 'db'], ['Цветна осмица', 3, 'c8'],
   ['Ултимат морски шах', 2, 'ut'], ['Покер със зарове', 2, 'dp'], ['Мемори', 3, 'mm'],
-  ['Не се сърди човече', 3, 'ld'], ['Табла', 2, 'tb'], ['Морски бой', 2, 'bs'],
+  ['Не се сърди човече', 3, 'ld'], ['Табла', 2, 'tb'], ['Морски бой', 2, 'bs'], ['Мини голф', 3, 'gf'],
 ];
 const only = process.env.ONLY?.split(',');
 const results = [];
