@@ -16,6 +16,7 @@ import quiz from './quiz.js';
 import reaction from './reaction.js';
 import pong from './pong.js';
 import hockey from './hockey.js';
+import { FX_CSS } from '../ui/fx.js';
 
 export const GAMES = [connect4, reversi, dots, color8, uttt, dice, memory, ludo, tabla, battleship, golf, checkers, quiz, reaction, pong, hockey];
 export const gameById = (id) => GAMES.find((g) => g.id === id) ?? null;
@@ -25,7 +26,7 @@ export function injectGameCss() {
   if (injected) return;
   injected = true;
   const style = document.createElement('style');
-  style.textContent = GAMES.map((g) => g.css ?? '').join('\n');
+  style.textContent = [FX_CSS, ...GAMES.map((g) => g.css ?? '')].join('\n');
   document.head.append(style);
 }
 

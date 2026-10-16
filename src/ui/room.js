@@ -11,6 +11,7 @@ import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet, optionsCo
 import { isBot, botMove, BOT_LEVELS } from '../core/bots.js';
 import { seriesTotals, seriesDone, pickSeriesGames } from '../core/series.js';
 import { GAMES } from '../games/index.js';
+import { playFx, reducedMotion } from './fx.js';
 
 const REACTIONS = ['👍', '😂', '😮', '😡', '🎉', '❤️'];
 const HOST_GRACE_MS = 20000;
@@ -68,6 +69,10 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   let recordedRound = 0;
   let autoStartFor = -1;
   let resignArmed = false;
+  let freshAcc = -1;
+  let animatedAcc = -1;
+  let wasMine = null;
+  let seatTurnKey = '';
   let destroyed = false;
   // Лични данни на играта за рунда (напр. скрития флот) и памет за чернови.
   const secret = { round: 0, data: null, loaded: false, loading: null };
@@ -211,6 +216,15 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     };
   }
 
+  // Кои играчи са на ход сега (при някои игри са няколко едновременно).
+  function turnIds() {
+    if (!result || result.over || result.game.realtime) return [];
+    const g = result.game;
+    if (g.waitingFor) return g.waitingFor(result.state);
+    return result.current != null ? [result.current] : [];
+  }
+  const seatColor = (id) => `var(--seat-${view.room.players.indexOf(id) + 1})`;
+
   // ---- места ----
   function renderSeats() {
     const room = view.room;
@@ -221,6 +235,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       : [...humans, ...botsOf().map((b) => b.id)];
     const amHostHere = room.hostId === me && !playing;
     const ready = new Set(readyIds());
+    const turning = playing ? turnIds() : [];
     mount(seatsEl, ids.map((id) => {
       const info = memberInfo(id);
       const seatIdx = room.players.indexOf(id);
@@ -234,11 +249,14 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       if (left) sub = 'излезе';
       else if (!isOnline(id)) sub = 'не е тук';
       const showReady = (!playing && (room.status === 'lobby' ? (id === room.hostId || ready.has(id)) : ready.has(id)));
-      return h('div', { class: `seat${result?.current === id && playing ? ' turn' : ''}${isOnline(id) && !left ? '' : ' away'}` },
+      const onTurn = playing && turning.includes(id);
+      return h('div', { class: `seat${onTurn ? ' turn' : ''}${isOnline(id) && !left ? '' : ' away'}`, '--disc': inGame ? `var(--seat-${seatIdx + 1})` : null, 'data-seat': id },
         avatarEl(info, 'sm'),
         h('div', { style: { minWidth: 0 } },
           h('div', { class: 'name', text: nickOf(id) }),
-          sub && h('div', { class: 'sub', text: sub }),
+          onTurn
+            ? h('div', { class: 'sub turn-sub' }, h('span', { text: id === me ? 'твой ход' : 'на ход' }), h('span', { class: 'think', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')))
+            : sub && h('div', { class: 'sub', text: sub }),
         ),
         inGame && h('span', { class: 'disc-dot', '--disc': `var(--seat-${seatIdx + 1})`, 'aria-hidden': 'true' }),
         showReady && !bot && h('span', { class: 'badge ok', text: 'готов' }),
@@ -248,6 +266,13 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
         }),
       );
     }));
+    // Мястото на играча на ход да се вижда, когато местата не се събират на екрана.
+    const tk = turning.join(',');
+    if (tk && tk !== seatTurnKey && seatsEl.scrollWidth > seatsEl.clientWidth + 4) {
+      const el = seatsEl.querySelector('.seat.turn');
+      if (el) seatsEl.scrollTo({ left: el.offsetLeft - seatsEl.offsetLeft - (seatsEl.clientWidth - el.offsetWidth) / 2, behavior: reducedMotion() ? 'auto' : 'smooth' });
+    }
+    seatTurnKey = tk;
   }
 
   // ---- сцена ----
@@ -479,13 +504,20 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       return;
     }
     const playedGame = result.game;
-    const boardEl = h('div', { class: 'board-wrap' });
-    const myTurn = result.current === me;
-    const status = h('div', { class: `status-line${myTurn ? ' mine' : ''}` },
-      result.current != null && h('span', { class: 'disc-dot', '--disc': `var(--seat-${room.players.indexOf(result.current) + 1})`, 'aria-hidden': 'true' }),
-      h('span', { text: playedGame.status?.(result.state, me, nickOf) ?? (myTurn ? 'Твой ход' : `Ход на ${nickOf(result.current)}`) }),
+    const turning = turnIds();
+    const myTurn = turning.includes(me) && room.players.includes(me);
+    const turnColor = myTurn ? seatColor(me) : turning.length === 1 ? seatColor(turning[0]) : 'var(--ink-2)';
+    const boardEl = h('div', { class: `board-wrap${myTurn ? ' my-turn' : ''}`, '--turn': turnColor });
+    const who = turning.length === 1 ? turning[0] : null;
+    const acc = result.accepted.length;
+    const fresh = acc === freshAcc && animatedAcc !== acc;
+    const status = h('div', { class: `status-line${myTurn ? ' mine' : ''}${myTurn && (fresh || acc === 0) ? ' pop' : ''}${turning.length ? ' has-turn' : ''}`, '--turn': turnColor, 'aria-live': 'off' },
+      who && avatarEl(memberInfo(who), 'xs'),
+      h('span', { class: 'status-text', text: playedGame.status?.(result.state, me, nickOf) ?? (myTurn ? 'Твой ход' : result.current ? `Ход на ${nickOf(result.current)}` : '') }),
       timerEl,
     );
+    animatedAcc = acc;
+    const lastRec = result.accepted.at(-1);
     if (scratch.round !== room.round) { scratch.dispose?.(); scratch = { round: room.round }; }
     playedGame.render(boardEl, result.state, {
       me, over: result.over || pending, players: room.players, nickOf, sound, toast, scratch,
@@ -494,6 +526,8 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       botLevel: (id) => botsOf().find((b) => b.id === id)?.level ?? 'medium',
       secret: secretApi(room.round),
       reveals: Object.fromEntries(Object.entries(reveals).filter(([, v]) => v.round === room.round)),
+      last: lastRec ? { move: lastRec.applied, actor: lastRec.actor, fresh, index: acc } : null,
+      myTurn,
     });
     const parts = [result.over ? resultBanner() : status, boardEl];
     if (!result.over && room.players.includes(me)) {
@@ -514,6 +548,15 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     }
     if (result.over) parts.splice(1, 0, rematchPanel());
     mount(stageEl, parts);
+    if (fresh) playFx(boardEl);
+  }
+
+  // Голямо „Твой ход!“ за миг, когато ходът стане мой.
+  function turnPop(text) {
+    stageEl.querySelector('.turn-pop')?.remove();
+    const el = h('div', { class: 'turn-pop', '--turn': seatColor(me), 'aria-hidden': 'true', text });
+    stageEl.append(el);
+    setTimeout(() => el.remove(), reducedMotion() ? 900 : 1900);
   }
 
   function secretApi(round) {
@@ -596,6 +639,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const acc = result?.accepted.length ?? -1;
     if (acc !== lastAccepted) {
       if (lastAccepted >= 0 && acc > lastAccepted && result) {
+        freshAcc = acc;
         const lastMove = result.accepted.at(-1);
         if (lastMove?.applied?.type !== 'resign') (sound[result.game.moveSound] ?? sound.tap)();
         if (!result.over && result.current === me && lastMove?.actor !== me) { setTimeout(sound.turn, 250); vibrate(60); }
@@ -673,6 +717,10 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       activeMembers(view.members).map((m) => [m.id, m.data.readyFor, m.data.nick, m.data.avatar]),
     ]);
     if (key !== stageKey) { stageKey = key; renderStage(); }
+    // „Твой ход!“ при смяна (не при първото зареждане и не при игри, в които всички играят наведнъж).
+    const mineNow = Boolean(result && !result.over && room.status === 'playing' && room.players.includes(me) && !result.game.waitingFor && turnIds().includes(me));
+    if (mineNow && wasMine === false) turnPop(result.accepted.length === 0 ? 'Ти започваш!' : 'Твой ход!');
+    if (view?.room) wasMine = mineNow;
     if (result) {
       announce(result.over
         ? (result.winner === me ? 'Победа!' : result.winner === 'draw' ? 'Равенство.' : `Печели ${nickOf(result.winner)}.`)

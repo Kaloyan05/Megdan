@@ -96,12 +96,14 @@ function step(s0, st) {
   if (promote) v += 2;
   s.board[st.to] = v;
   s.ply += 1;
-  s.last = { from: st.from, to: st.to, seat, capture: st.over !== null, promoted: promote };
+  s.last = { from: st.from, to: st.to, seat, capture: st.over !== null, over: st.over, promoted: promote, removed: [] };
   if (st.over !== null) {
     s.taken.push(st.over);
     s.quiet = 0;
     const more = captureSteps({ ...s, chain: st.to }, st.to);
     if (more.length) { s.chain = st.to; return s; }
+    // Взетите фигури слизат от дъската накрая на веригата (пазя ги за анимацията).
+    s.last.removed = s.taken.map((t) => ({ i: t, v: s.board[t] }));
     for (const t of s.taken) s.board[t] = null;
     s.taken = [];
   } else {
@@ -217,6 +219,8 @@ export default {
     const sel = ctx.scratch ?? {};
     if (sel.ply !== s.ply) { sel.ply = s.ply; sel.from = s.chain; }
     const mustCapture = steps.some((x) => x.over !== null);
+    const fresh = Boolean(ctx.last?.fresh && s.last);
+    const ghosts = new Map(fresh ? s.last.removed.map((r) => [r.i, r.v]) : []);
 
     const draw = () => {
       el.innerHTML = '';
@@ -242,6 +246,7 @@ export default {
         const cell = make(dark ? 'button' : 'span', `ck-cell ${dark ? 'dark' : 'light'}`);
         if (dark) {
           cell.type = 'button';
+          cell.dataset.fx = `ck-${i}`;
           const v = s.board[i];
           const isSrc = sources.has(i), isTgt = targets.has(i);
           cell.disabled = !(isSrc || isTgt);
@@ -254,8 +259,18 @@ export default {
           if (v !== null) {
             const pc = make('span', 'ck-piece' + (isKing(v) ? ' king' : '') + (s.taken.includes(i) ? ' taken' : ''));
             pc.style.setProperty('--p', `var(--seat-${ownerOf(v) + 1})`);
-            if (isKing(v)) pc.textContent = '♛';
+            if (isKing(v)) pc.append(make('span', `ck-crown${fresh && s.last.to === i && s.last.promoted ? ' fx-pop' : ''}`, '♛'));
+            if (fresh && s.last.to === i) {
+              // Плъзга се от старото място; при вземане минава над взетата фигура.
+              pc.dataset.fxPath = s.last.over !== null ? `ck-${s.last.from},ck-${s.last.over}` : `ck-${s.last.from}`;
+            }
+            if (fresh && s.last.over === i && s.taken.includes(i)) pc.classList.add('just-taken');
             cell.append(pc);
+          } else if (ghosts.has(i)) {
+            const g = make('span', 'ck-piece fx-vanish' + (isKing(ghosts.get(i)) ? ' king' : ''));
+            g.style.setProperty('--p', `var(--seat-${ownerOf(ghosts.get(i)) + 1})`);
+            g.style.animationDelay = '.32s';
+            cell.append(g);
           }
           cell.addEventListener('click', () => {
             if (isTgt) { const st = targets.get(i); sel.from = null; ctx.onMove({ from: st.from, to: st.to }); return; }
@@ -286,21 +301,43 @@ export default {
   },
 
   css: `
-.ck { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); width:min(100%,440px); margin-inline:auto; border:3px solid var(--ink);
-  border-radius:var(--r-md); overflow:hidden; box-shadow:var(--shadow-pop); }
-.ck-cell { aspect-ratio:1; display:grid; place-items:center; border:0; padding:0; }
-.ck-cell.light { background:#f3e3c3; }
-.ck-cell.dark { background:#8a5a2c; cursor:default; }
-.ck-cell.dark.last { background:#a06c38; }
+/* Дъска от дърво: светъл явор и тъмен орех с фина шарка, рамка с ръб. */
+.ck { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); width:min(100%,440px); margin-inline:auto; padding:10px; border-radius:16px;
+  background:linear-gradient(135deg,#7a4a22,#5a3214 60%,#6b3d1b); border:2px solid #3a200c;
+  box-shadow: inset 0 2px 0 rgb(255 220 170 / .35), inset 0 -3px 0 rgb(0 0 0 / .35), 0 8px 0 #2f1a0a, 0 16px 26px rgb(40 20 5 / .35); }
+.ck-cell { aspect-ratio:1; display:grid; place-items:center; border:0; padding:0; position:relative; }
+.ck-cell.light { background:
+  repeating-linear-gradient(100deg, rgb(160 110 50 / .07) 0 3px, transparent 3px 9px),
+  linear-gradient(160deg,#f6e4c0,#e9cf9e); }
+.ck-cell.dark { cursor:default; background:
+  repeating-linear-gradient(80deg, rgb(0 0 0 / .08) 0 2px, transparent 2px 7px),
+  linear-gradient(160deg,#8d5b2d,#6e4220); }
+.ck-cell.dark.last { background:
+  repeating-linear-gradient(80deg, rgb(0 0 0 / .06) 0 2px, transparent 2px 7px),
+  linear-gradient(160deg,#a9743f,#8a592c); box-shadow: inset 0 0 0 2px rgb(255 210 120 / .55); }
 .ck-cell.src { cursor:pointer; }
-.ck-cell.src .ck-piece { box-shadow:0 0 0 3px var(--sun), inset 0 -3px 0 rgb(0 0 0 / .25); }
-.ck-cell.sel .ck-piece { box-shadow:0 0 0 4px var(--focus), inset 0 -3px 0 rgb(0 0 0 / .25); }
+.ck-cell.src .ck-piece { outline:3px solid var(--sun); outline-offset:2px; }
+.ck-cell.sel .ck-piece { outline:3px solid var(--focus); outline-offset:2px; transform:translateY(-4px) scale(1.07);
+  box-shadow: inset 0 0 0 3px var(--ring-d), inset 0 0 0 5px var(--ring-l), 0 9px 0 -2px var(--edge), 0 14px 14px rgb(0 0 0 / .35); }
 .ck-cell.tgt { cursor:pointer; }
-.ck-cell.tgt::after { content:""; width:30%; height:30%; border-radius:50%; background:var(--sun); border:2px solid var(--ink); }
+.ck-cell.tgt::after { content:""; width:30%; height:30%; border-radius:50%; background:var(--sun); border:2px solid #3a200c;
+  box-shadow:0 0 0 0 rgb(255 199 67 / .6); animation: ckTgt 1.3s ease-out infinite; }
+@keyframes ckTgt { 70% { box-shadow:0 0 0 10px rgb(255 199 67 / 0); } 100% { box-shadow:0 0 0 0 rgb(255 199 67 / 0); } }
 .ck-cell:focus-visible { outline:3px solid var(--focus); outline-offset:-3px; }
-.ck-piece { width:78%; aspect-ratio:1; border-radius:50%; background:var(--p); border:2px solid var(--ink); display:grid; place-items:center;
-  color:#fff; font-size:clamp(.9rem,4vw,1.3rem); line-height:1; box-shadow:inset 0 -3px 0 rgb(0 0 0 / .25); text-shadow:0 1px 0 rgb(0 0 0 / .4); }
-.ck-piece.taken { opacity:.35; }
+/* Пул: обемен, с жлеб по ръба и сянка върху дъската. */
+.ck-piece { --ring-d: color-mix(in srgb, var(--p) 70%, #000); --ring-l: color-mix(in srgb, var(--p) 70%, #fff); --edge: color-mix(in srgb, var(--p) 50%, #000);
+  width:80%; aspect-ratio:1; border-radius:50%; display:grid; place-items:center; position:relative;
+  background:radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--p) 45%, #fff) 0 10%, var(--p) 46%, color-mix(in srgb, var(--p) 75%, #000) 100%);
+  box-shadow: inset 0 0 0 3px var(--ring-d), inset 0 0 0 5px var(--ring-l), inset 0 0 0 7px color-mix(in srgb, var(--p) 85%, #000),
+    0 4px 0 -1px var(--edge), 0 7px 8px rgb(0 0 0 / .35);
+  transition: transform .18s cubic-bezier(.2,1.4,.4,1), box-shadow .18s; }
+.ck-piece.king { box-shadow: inset 0 0 0 3px var(--ring-d), inset 0 0 0 5px var(--ring-l), inset 0 0 0 7px color-mix(in srgb, var(--p) 85%, #000),
+    0 4px 0 -1px var(--edge), 0 8px 0 -1px color-mix(in srgb, var(--p) 80%, #000), 0 11px 0 -1px var(--edge), 0 13px 10px rgb(0 0 0 / .35); transform:translateY(-4px); }
+.ck-crown { color:#ffd54a; font-size:clamp(.95rem,4.2vw,1.35rem); line-height:1; text-shadow:0 1px 0 #7a5200, 0 0 6px rgb(255 213 74 / .6); }
+.ck-piece.taken { opacity:.4; filter:grayscale(.5); transform:scale(.88); transition: opacity .3s .25s, transform .3s .25s; }
+.ck-piece.just-taken { animation: ckHit .45s ease-out .25s backwards; }
+@keyframes ckHit { 0% { opacity:1; filter:none; transform:scale(1); } 40% { transform:scale(1.15) rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .ck-cell.tgt::after, .ck-piece.just-taken { animation:none; } }
 .ck-art { display:grid; grid-template-columns:repeat(4,22px); border:2px solid var(--ink); border-radius:6px; overflow:hidden; }
 .ck-art span { height:22px; display:grid; place-items:center; }
 .ck-art .l { background:#f3e3c3; }
