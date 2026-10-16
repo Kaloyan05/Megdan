@@ -3,6 +3,7 @@
 // Шестица изкарва от базата и дава още хвърляне. Без фигури на пътя имаш 3 опита за шестица.
 
 import { createRng } from '../core/rng.js';
+import { dieEl } from '../ui/fx.js';
 
 const TRACK = 40;
 const HOME = 4;
@@ -125,7 +126,7 @@ export default {
       s.pieces.forEach((list, other) => {
         if (other === seat) return;
         list.forEach((r, j) => {
-          if (r >= 0 && r < TRACK && absOf(s.corners[other], r) === abs) { list[j] = -1; s.last.hit = other; }
+          if (r >= 0 && r < TRACK && absOf(s.corners[other], r) === abs) { list[j] = -1; s.last.hit = other; s.last.hitPiece = j; }
         });
       });
     }
@@ -167,24 +168,38 @@ export default {
     el.innerHTML = '';
     const make = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
+    const fresh = Boolean(ctx.last?.fresh && s.last);
+    const lm = fresh && s.last.kind === 'move' ? s.last : null;
+    // Ключ на клетката, в която стои фигура k на мястото seat при позиция rel.
+    const cellKey = (seat, rel, k) => {
+      const corner = s.corners[seat];
+      if (rel === -1) return `ld-b${corner}-${k}`;
+      if (rel >= TRACK) return `ld-h${corner}-${rel - TRACK}`;
+      return `ld-p${absOf(corner, rel)}`;
+    };
     const board = make('div', 'ld');
     board.setAttribute('role', 'group');
     board.setAttribute('aria-label', 'Дъска');
     const place = (node, [c, r]) => { node.style.gridColumn = String(c + 1); node.style.gridRow = String(r + 1); board.append(node); };
     PATH.forEach((xy, i) => {
       const cell = make('span', 'ld-cell');
+      cell.dataset.fx = `ld-p${i}`;
       const startCorner = i % 10 === 0 ? i / 10 : -1;
       const seat = s.corners.indexOf(startCorner);
       if (seat >= 0) cell.style.setProperty('--tint', `var(--seat-${seat + 1})`), cell.classList.add('start');
       place(cell, xy);
     });
     s.corners.forEach((corner, seat) => {
-      HOMES[corner].forEach((xy) => { const c = make('span', 'ld-cell home'); c.style.setProperty('--tint', `var(--seat-${seat + 1})`); place(c, xy); });
-      BASES[corner].forEach((xy) => { const c = make('span', 'ld-cell base'); c.style.setProperty('--tint', `var(--seat-${seat + 1})`); place(c, xy); });
+      HOMES[corner].forEach((xy, j) => { const c = make('span', 'ld-cell home'); c.dataset.fx = `ld-h${corner}-${j}`; c.style.setProperty('--tint', `var(--seat-${seat + 1})`); place(c, xy); });
+      BASES[corner].forEach((xy, j) => { const c = make('span', 'ld-cell base'); c.dataset.fx = `ld-b${corner}-${j}`; c.style.setProperty('--tint', `var(--seat-${seat + 1})`); place(c, xy); });
     });
     const dieCell = make('span', 'ld-center');
-    if (s.die) dieCell.append(make('span', `dp-face f${s.die}`), ...[]);
-    if (s.die) for (let k = 0; k < s.die; k++) dieCell.firstChild.append(make('i'));
+    const shownDie = s.die ?? s.last?.die;
+    if (shownDie) {
+      const d = dieEl(shownDie, { roll: fresh && s.last.kind === 'roll', cls: s.die ? '' : 'used' });
+      d.style.setProperty('--die', 'color-mix(in srgb, var(--seat-' + ((s.last?.seat ?? 0) + 1) + ') 14%, #fff)');
+      dieCell.append(d);
+    }
     place(dieCell, [5, 5]);
 
     s.pieces.forEach((list, seat) => {
@@ -194,6 +209,15 @@ export default {
         const can = seat === seatMe && legal.has(k);
         const pc = make(can ? 'button' : 'span', 'ld-piece' + (can ? ' can' : '') + (s.last?.seat === seat && s.last?.piece === k && s.last.kind === 'move' ? ' last' : ''));
         pc.style.setProperty('--p', `var(--seat-${seat + 1})`);
+        // Фигурата подскача клетка по клетка; ударената се връща в базата след това.
+        if (lm && lm.seat === seat && lm.piece === k) {
+          const path = lm.from === -1 ? [cellKey(seat, -1, k)] : Array.from({ length: lm.to - lm.from }, (_, i) => cellKey(seat, lm.from + i, k));
+          pc.dataset.fxPath = path.join(',');
+        }
+        if (lm && lm.hit === seat && lm.hitPiece === k) {
+          pc.dataset.fxFrom = cellKey(lm.seat, lm.to, lm.piece);
+          pc.dataset.fxDelay = String(260 + Math.max(1, lm.to - lm.from) * 170);
+        }
         if (can) {
           pc.type = 'button';
           pc.setAttribute('aria-label', `Фигура ${k + 1}${rel === -1 ? ' от базата' : ''}, премести`);
@@ -229,18 +253,30 @@ export default {
 .ld-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center; margin-bottom:10px; }
 .ld-bar .hint { min-height:1.4em; }
 .ld { display:grid; grid-template-columns:repeat(11,minmax(0,1fr)); grid-template-rows:repeat(11,auto); gap:3px; width:min(100%,440px); margin-inline:auto;
-  padding:8px; background:var(--surface); border:2px solid var(--ink); border-radius:var(--r-lg); box-shadow:var(--shadow-pop); }
-.ld-cell { aspect-ratio:1; border-radius:50%; background:var(--surface-2); box-shadow:inset 0 0 0 2px var(--line); grid-area:auto; }
-.ld-cell.start, .ld-cell.home { background:color-mix(in srgb, var(--tint) 40%, var(--surface)); box-shadow:inset 0 0 0 2px var(--tint); }
-.ld-cell.base { background:color-mix(in srgb, var(--tint) 18%, var(--surface)); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--tint) 60%, var(--surface)); }
-.ld-center { display:grid; place-items:center; }
-.ld-center .dp-face { width:100%; aspect-ratio:1; background:#fff; border:2px solid var(--ink); border-radius:6px; padding:2px; }
-.ld-piece { z-index:1; place-self:center; width:76%; aspect-ratio:1; border-radius:50%; background:var(--p); border:2px solid var(--ink);
-  box-shadow:inset 0 -3px 0 rgb(0 0 0 / .25); padding:0; }
-.ld-piece.can { cursor:pointer; animation:ldpulse .8s ease-in-out infinite alternate; box-shadow:0 0 0 3px var(--sun), inset 0 -3px 0 rgb(0 0 0 / .25); }
-.ld-piece.last { outline:2px solid var(--ink); outline-offset:1px; }
+  padding:10px; border-radius:18px; border:2px solid #3a200c;
+  background: repeating-linear-gradient(95deg, rgb(120 70 20 / .05) 0 2px, transparent 2px 12px), linear-gradient(160deg,#fbf0d9,#f0dcb4);
+  box-shadow: inset 0 0 0 6px #b0753c, inset 0 0 0 8px #6b3d1b, 0 8px 0 #4a2810, 0 16px 26px rgb(40 20 5 / .3); }
+/* Клетки: вдлъбнати гнезда. */
+.ld-cell { aspect-ratio:1; border-radius:50%; grid-area:auto; background:radial-gradient(circle at 50% 40%, #fffaf0, #eadbbd);
+  box-shadow: inset 0 2px 3px rgb(80 50 10 / .3), inset 0 -1px 0 rgb(255 255 255 / .8), 0 0 0 1.5px rgb(120 80 30 / .35); }
+.ld-cell.start, .ld-cell.home { background:radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--tint) 45%, #fff), color-mix(in srgb, var(--tint) 70%, #fff));
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / .25), 0 0 0 2px var(--tint); }
+.ld-cell.base { background:radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--tint) 18%, #fff), color-mix(in srgb, var(--tint) 32%, #fff));
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / .2), 0 0 0 2px color-mix(in srgb, var(--tint) 60%, #fff); }
+.ld-center { display:grid; place-items:center; --die-size:100%; }
+.ld-center .die3d { width:92%; padding:12%; }
+/* Пионка, гледана отгоре: основа, вдлъбнатина и глава. */
+.ld-piece { --edge: color-mix(in srgb, var(--p) 50%, #000); z-index:1; place-self:center; width:80%; aspect-ratio:1; border-radius:50%; padding:0; position:relative;
+  border:1px solid rgb(0 0 0 / .5);
+  background:
+    radial-gradient(circle at 42% 36%, color-mix(in srgb, var(--p) 30%, #fff) 0 9%, color-mix(in srgb, var(--p) 85%, #fff) 16%, var(--p) 30%, color-mix(in srgb, var(--p) 65%, #000) 38%, transparent 40%),
+    radial-gradient(circle at 40% 32%, color-mix(in srgb, var(--p) 55%, #fff) 0 18%, var(--p) 55%, color-mix(in srgb, var(--p) 70%, #000) 100%);
+  box-shadow: 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); transition: transform .2s cubic-bezier(.2,1.4,.4,1); }
+.ld-piece.can { cursor:pointer; animation:ldpulse .8s ease-in-out infinite alternate; }
+.ld-piece.last { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--edge), 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); }
 .ld-piece:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-@keyframes ldpulse { to { box-shadow:0 0 0 6px var(--sun), inset 0 -3px 0 rgb(0 0 0 / .25); } }
+@keyframes ldpulse { from { transform:translateY(0); box-shadow:0 0 0 3px var(--sun), 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); }
+  to { transform:translateY(-3px) scale(1.06); box-shadow:0 0 0 6px var(--sun), 0 5px 0 var(--edge), 0 9px 8px rgb(0 0 0 / .3); } }
 .ld-art { display:grid; grid-template-columns:repeat(2,26px); gap:8px; padding:8px; border:2px solid var(--ink); border-radius:10px; background:var(--surface); }
 .ld-art span { width:26px; height:26px; border-radius:50%; border:2px solid var(--ink); }
 @media (prefers-reduced-motion: reduce) { .ld-piece.can { animation:none; } }

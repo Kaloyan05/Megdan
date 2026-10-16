@@ -6,6 +6,7 @@
 
 import { createRng } from '../core/rng.js';
 import { bestBy } from '../core/bots.js';
+import { dieEl } from '../ui/fx.js';
 
 const persp = (seat, idx) => (seat === 0 ? idx : 23 - idx);
 const absIdx = (seat, p) => (seat === 0 ? p : 23 - p);
@@ -203,6 +204,9 @@ export default {
     const steps = myTurn ? legalSteps(s) : [];
     const make = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     let selected = null;
+    const fresh = Boolean(ctx.last?.fresh && s.last);
+    const lastStep = fresh && s.last.kind === 'step' ? s.last : null;
+    const lastRoll = fresh && s.last.kind === 'roll';
 
     const draw = () => {
       el.innerHTML = '';
@@ -217,11 +221,7 @@ export default {
         const [a, b] = s.rolled;
         faces = a === b ? [a, a, a, a].map((v, i) => ({ v, used: i >= s.dice.length })) : [{ v: a, used: !s.dice.includes(a) }, { v: b, used: !s.dice.includes(b) }];
       } else if (s.last?.kind === 'roll' && s.last.stuck) faces = s.last.dice.map((v) => ({ v, used: true }));
-      faces.forEach(({ v, used }) => {
-        const d = make('span', `dp-face f${v}${used ? ' used' : ''}`);
-        for (let k = 0; k < v; k++) d.append(make('i'));
-        diceBox.append(d);
-      });
+      faces.forEach(({ v, used }, k) => diceBox.append(dieEl(v, { cls: used ? 'used' : '', roll: lastRoll && !selected, delay: k * 70 })));
       const roll = make('button', 'btn btn-primary', 'Хвърли');
       roll.type = 'button';
       roll.disabled = ctx.over || seatMe !== s.turn || s.phase !== 'roll';
@@ -247,12 +247,16 @@ export default {
         btn.setAttribute('aria-label', `Поле ${persp(seatMe < 0 ? 0 : seatMe, idx) + 1}${count ? `, ${count} ${seat === seatMe ? 'твои' : 'чужди'}` : ''}${isTgt ? ', премести тук' : isSrc ? ', избери' : ''}`);
         btn.addEventListener('click', () => click(idx));
         const stack = make('span', 'tb-stack');
-        for (let k = 0; k < Math.min(count, 5); k++) {
+        const shown = Math.min(count, 5);
+        for (let k = 0; k < shown; k++) {
           const c = make('span', 'tb-ch');
           c.style.setProperty('--p', `var(--seat-${seat + 1})`);
           if (k === 4 && count > 5) c.textContent = String(count);
+          // Последният преместен пул тръгва от старото си място.
+          if (lastStep && lastStep.to === idx && k === shown - 1) { c.dataset.fx = 'tb-dst'; c.dataset.fxFrom = 'tb-src'; }
           stack.append(c);
         }
+        if (lastStep && lastStep.from === idx && shown < 5) { const g = make('span', 'tb-ch tb-slot'); g.dataset.fx = 'tb-src'; stack.append(g); }
         btn.append(stack);
         return btn;
       };
@@ -264,12 +268,16 @@ export default {
         b.disabled = !isSrc;
         b.setAttribute('aria-label', `Бар: ${s.bar[seat]}${isSrc ? ', влез оттук' : ''}`);
         b.addEventListener('click', () => click('bar'));
-        for (let k = 0; k < Math.min(s.bar[seat], 4); k++) {
+        const shown = Math.min(s.bar[seat], 4);
+        for (let k = 0; k < shown; k++) {
           const c = make('span', 'tb-ch');
           c.style.setProperty('--p', `var(--seat-${seat + 1})`);
           if (k === 3 && s.bar[seat] > 4) c.textContent = String(s.bar[seat]);
+          // Ударен пул: отлита от полето към бара.
+          if (lastStep?.hit && seat !== lastStep.seat && k === shown - 1) { c.dataset.fxFrom = 'tb-dst'; c.dataset.fxDelay = '280'; }
           b.append(c);
         }
+        if (lastStep?.from === 'bar' && seat === lastStep.seat && shown < 4) { const g = make('span', 'tb-ch tb-slot'); g.dataset.fx = 'tb-src'; b.append(g); }
         return b;
       };
       const topIdx = [12, 13, 14, 15, 16, 17, 'bar', 18, 19, 20, 21, 22, 23];
@@ -286,7 +294,9 @@ export default {
         o.disabled = !isTgt;
         o.style.setProperty('--p', `var(--seat-${seat + 1})`);
         o.setAttribute('aria-label', `Изнесени на ${ctx.nickOf(s.players[seat])}: ${s.off[seat]}${isTgt ? ', изнеси тук' : ''}`);
-        o.append(make('span', 'tb-ch'), make('span', 'num', `${ctx.nickOf(s.players[seat])}: ${s.off[seat]}/15`));
+        const chip = make('span', 'tb-ch');
+        if (lastStep?.to === 'off' && seat === lastStep.seat) chip.dataset.fxFrom = 'tb-src';
+        o.append(chip, make('span', 'num', `${ctx.nickOf(s.players[seat])}: ${s.off[seat]}/15`));
         o.addEventListener('click', () => click('off'));
         offRow.append(o);
       });
@@ -320,35 +330,51 @@ export default {
   },
 
   css: `
-.tb-dice { display:flex; gap:6px; }
-.tb-dice .dp-face { width:38px; height:38px; background:#fff; border:2px solid var(--ink); border-radius:8px; padding:4px; }
-.tb-dice .dp-face.used { opacity:.35; }
-.tb { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)) minmax(0,.8fr) repeat(6,minmax(0,1fr)); grid-template-rows:auto auto;
-  width:min(100%,520px); margin-inline:auto; padding:6px; gap:0 2px; background:var(--wood, #b07a45); border:3px solid var(--ink); border-radius:var(--r-lg); box-shadow:var(--shadow-pop); }
+.tb-dice { display:flex; gap:8px; min-height:44px; --die-size:40px; }
+/* Дъска: рамка от орех, игрално поле от светло дърво, триъгълници в бордо и слонова кост. */
+.tb { position:relative; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)) minmax(0,.8fr) repeat(6,minmax(0,1fr)); grid-template-rows:auto auto;
+  width:min(100%,520px); margin-inline:auto; padding:10px 8px; gap:0 2px; border-radius:16px; border:2px solid #3a200c;
+  background:
+    repeating-linear-gradient(92deg, rgb(120 70 20 / .08) 0 2px, transparent 2px 11px),
+    linear-gradient(180deg,#e2b97f,#d3a466 50%,#e2b97f);
+  box-shadow: inset 0 0 0 7px #6b3d1b, inset 0 0 0 9px #3a200c, inset 0 4px 14px rgb(60 30 5 / .35), 0 8px 0 #2f1a0a, 0 16px 26px rgb(40 20 5 / .35); }
 .tb-pt { position:relative; height:clamp(120px,34vw,170px); border:0; padding:0; background:none; cursor:default; display:flex; }
-.tb-pt::before { content:""; position:absolute; inset:0; background:var(--tri); clip-path:polygon(0 0,100% 0,50% 88%); }
+.tb-pt::before { content:""; position:absolute; inset:0; background:var(--tri); clip-path:polygon(0 0,100% 0,50% 88%);
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / .2)); }
 .tb-pt.bottom::before { clip-path:polygon(50% 12%,100% 100%,0 100%); }
-.tb-pt.even { --tri: color-mix(in srgb, var(--accent) 80%, #fff); }
-.tb-pt.odd { --tri: #f6ecd8; }
+.tb-pt.even { --tri: linear-gradient(180deg,#a8322a,#7c1e19); }
+.tb-pt.bottom.even { --tri: linear-gradient(0deg,#a8322a,#7c1e19); }
+.tb-pt.odd { --tri: linear-gradient(180deg,#fbf2df,#e9d7b2); }
+.tb-pt.bottom.odd { --tri: linear-gradient(0deg,#fbf2df,#e9d7b2); }
 .tb-pt.top { flex-direction:column; }
 .tb-pt.bottom { flex-direction:column-reverse; }
 .tb-stack { position:relative; z-index:1; display:flex; flex-direction:inherit; align-items:center; width:100%; }
-.tb-ch { width:min(100%,26px); aspect-ratio:1; border-radius:50%; background:var(--p); border:2px solid var(--ink); display:grid; place-items:center;
-  color:#fff; font:800 .7rem/1 var(--f-body); box-shadow:inset 0 -2px 0 rgb(0 0 0 / .25); flex:none; }
+/* Пул: обемен диск с вдлъбнат център. */
+.tb-ch { --edge: color-mix(in srgb, var(--p) 50%, #000); position:relative; width:min(100%,27px); aspect-ratio:1; border-radius:50%; flex:none;
+  background:radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--p) 80%, #000) 0 22%, transparent 24%),
+    radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--p) 45%, #fff) 0 12%, var(--p) 50%, color-mix(in srgb, var(--p) 72%, #000) 100%);
+  border:1px solid rgb(0 0 0 / .45); display:grid; place-items:center; color:#fff; font:800 .7rem/1 var(--f-body); text-shadow:0 1px 1px rgb(0 0 0 / .6);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--p) 70%, #fff), 0 2px 0 var(--edge), 0 3px 4px rgb(0 0 0 / .3); }
+.tb-ch.tb-slot { visibility:hidden; }
 .tb-pt.src { cursor:pointer; }
-.tb-pt.src .tb-stack > :last-child { box-shadow:0 0 0 3px var(--sun); }
-.tb-pt.sel .tb-stack > :last-child { box-shadow:0 0 0 4px var(--focus); }
+.tb-pt.src .tb-stack > .tb-ch:not(.tb-slot):last-of-type { outline:3px solid var(--sun); outline-offset:1px; }
+.tb-pt.sel .tb-stack > .tb-ch:not(.tb-slot):last-of-type { outline:3px solid var(--focus); outline-offset:1px; transform:scale(1.12); }
 .tb-pt.tgt { cursor:pointer; }
-.tb-pt.tgt::after { content:""; position:absolute; left:50%; width:16px; height:16px; margin-left:-8px; border-radius:50%; background:var(--sun); border:2px solid var(--ink); z-index:2; }
+.tb-pt.tgt::after { content:""; position:absolute; left:50%; width:16px; height:16px; margin-left:-8px; border-radius:50%; background:var(--sun); border:2px solid #3a200c; z-index:2;
+  animation: tbTgt 1.3s ease-out infinite; }
+@keyframes tbTgt { 0% { box-shadow:0 0 0 0 rgb(255 199 67 / .7); } 70%, 100% { box-shadow:0 0 0 10px rgb(255 199 67 / 0); } }
 .tb-pt.top.tgt::after { bottom:14%; }
 .tb-pt.bottom.tgt::after { top:14%; }
 .tb-pt:focus-visible, .tb-barcol:focus-visible, .tb-offbox:focus-visible { outline:3px solid var(--focus); outline-offset:-3px; }
-.tb-barcol { grid-row:auto; border:0; padding:4px 0; background:color-mix(in srgb, var(--ink) 75%, var(--wood, #b07a45)); display:flex; flex-direction:column; align-items:center; gap:2px; cursor:default; }
+.tb-barcol { grid-row:auto; border:0; padding:4px 0; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:default;
+  background: repeating-linear-gradient(92deg, rgb(0 0 0 / .1) 0 2px, transparent 2px 8px), linear-gradient(90deg,#4a2810,#6b3d1b 50%,#4a2810);
+  box-shadow: inset 0 0 6px rgb(0 0 0 / .4); }
 .tb-barcol.src { cursor:pointer; box-shadow:inset 0 0 0 3px var(--sun); }
-.tb-off { display:flex; gap:10px; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+.tb-off { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
 .tb-offbox { display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:var(--r-pill); border:2px solid var(--line); background:var(--surface); font-weight:700; cursor:default; }
-.tb-offbox .tb-ch { width:18px; }
+.tb-offbox .tb-ch { width:20px; }
 .tb-offbox.tgt { border-color:var(--ink); background:var(--sun); color:#1b2333; cursor:pointer; box-shadow:0 3px 0 var(--ink); }
+@media (prefers-reduced-motion: reduce) { .tb-pt.tgt::after { animation:none; } }
 .tb-art { display:grid; grid-template-columns:repeat(6,12px); gap:2px; padding:6px; background:#b07a45; border:2px solid var(--ink); border-radius:8px; }
 .tb-art span { height:44px; background:#f6ecd8; clip-path:polygon(0 0,100% 0,50% 90%); }
 .tb-art span:nth-child(odd) { background:var(--accent); }

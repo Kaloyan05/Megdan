@@ -26,6 +26,7 @@ let profile = null;
 let cleanup = null;
 let turns = null;
 let currentRoom = null;
+let creating = false; // докато създавам стая: без известие „Твой ход“ за нея
 let myTurnCount = 0;
 
 const NAV = [
@@ -155,28 +156,34 @@ async function route() {
       return res;
     },
     onSolo: async (game, { timerSec, level, count, options }) => {
+      creating = true;
       try {
         const c = await api.playVsBots({ game, timerSec, profile, count, level, options });
+        currentRoom = c;
         go(c);
       } catch (e) {
         toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да започна игра. Опитай пак.', 4000);
-      }
+      } finally { creating = false; }
     },
     onSeries: async (series) => {
+      creating = true;
       try {
         const c = await api.createRoom({ gameId: series.games?.[0] ?? 'connect4', profile, series });
+        currentRoom = c;
         go(c);
       } catch (e) {
         toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да създам стая. Опитай пак.', 4000);
-      }
+      } finally { creating = false; }
     },
     onCreate: async (gameId, timerSec = 0, options = {}) => {
+      creating = true;
       try {
         const c = await api.createRoom({ gameId, timerSec, profile, options });
+        currentRoom = c;
         go(c);
       } catch (e) {
         toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да създам стая. Опитай пак.', 4000);
-      }
+      } finally { creating = false; }
     },
   });
 }
@@ -206,7 +213,7 @@ async function boot() {
     paintNav();
   });
   turns.onTurn((s) => {
-    if (s.code === currentRoom) return; // стаята сама известява
+    if (creating || s.code === currentRoom) return; // стаята сама известява
     sound.turn();
     try { navigator.vibrate?.(80); } catch { /* няма вибрация */ }
     toast(`Твой ход: ${s.game?.name ?? 'стая'} ${s.code}`, 4000);
