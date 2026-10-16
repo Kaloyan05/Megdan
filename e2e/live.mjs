@@ -8,13 +8,16 @@ const BASE = process.env.BASE ?? 'http://localhost:8080/';
 const LAG = process.env.LAG ?? '0';
 const out = process.argv[2] ?? '.';
 const errors = [];
-const browser = await chromium.launch();
+const real = Boolean(process.env.FIREBASE); // истинският сайт с Firebase: BASE=https://kaloyan05.github.io/Megdan/
+const proxy = real && process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY } : undefined;
+const browser = await chromium.launch(proxy ? { proxy } : {});
+const newCtx = () => browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2, ignoreHTTPSErrors: Boolean(proxy) });
 
 async function open(ctx, id, nick, tag) {
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errors.push(`${tag} ${e.message}`));
   p.on('console', (m) => m.type() === 'error' && errors.push(`${tag} console: ${m.text()}`));
-  await p.goto(`${BASE}?store=local&as=${id}&lag=${LAG}`);
+  await p.goto(real ? BASE : `${BASE}?store=local&as=${id}&lag=${LAG}`);
   await p.fill('#nick', nick);
   await p.getByRole('button', { name: 'Към мегдана' }).click();
   await p.getByRole('heading', { name: `Здравей, ${nick}!` }).waitFor();
@@ -57,9 +60,10 @@ async function solo(name, tag) {
 }
 
 async function duo(name, tag, how) {
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+  const ctx = await newCtx();
+  const ctxB = real ? await newCtx() : ctx; // при Firebase всеки играч е отделно устройство
   const a = await open(ctx, `${tag}a`, 'Калоян', `${tag}/a`);
-  const b = await open(ctx, `${tag}b`, 'Мила', `${tag}/b`);
+  const b = await open(ctxB, `${tag}b`, 'Мила', `${tag}/b`);
   await a.getByRole('button', { name: new RegExp(name) }).first().click();
   await a.locator('.pills[aria-label="Точки за победа"] .pill', { hasText: 'До 5' }).click();
   await a.getByRole('button', { name: 'Създай стая' }).click();
@@ -91,13 +95,16 @@ async function duo(name, tag, how) {
   const finals = await Promise.all([a, b].map((p) => p.locator('.lv-final').textContent().catch(() => '')));
   console.log(`${name}, двама (${how}): ${banners.join(' | ')} — ${finals.map((f) => f.replace(/\s+/g, ' ').trim()).join(' | ')}`);
   await ctx.close();
+  if (ctxB !== ctx) await ctxB.close();
   const nums = finals.map((f) => f.replace(/\D+/g, ' ').trim());
   return banners.every((x) => x !== 'НЯМА') && nums[0] === nums[1];
 }
 
 let ok = true;
-ok = (await solo('Понг', 'pong')) && ok;
-ok = (await solo('Въздушен хокей', 'hockey')) && ok;
+if (!real) {
+  ok = (await solo('Понг', 'pong')) && ok;
+  ok = (await solo('Въздушен хокей', 'hockey')) && ok;
+}
 ok = (await duo('Понг', 'pong2', 'play')) && ok;
 ok = (await duo('Въздушен хокей', 'hockey2', 'resign')) && ok;
 await browser.close();

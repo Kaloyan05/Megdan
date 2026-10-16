@@ -95,6 +95,15 @@ export default {
 };
 ```
 
+## Собствен сайт (GitHub Pages + Firebase)
+
+- Адрес: https://kaloyan05.github.io/Megdan/ (клон `gh-pages`, качва се с `npm run build && ./deploy.sh`).
+- Цел: поканата е линк; приятелят го отваря, пише име и влиза направо в стаята, вече „Готов“. Без регистрация (решение на собственика: само анонимен вход, без имейл/парола).
+- Firebase проект `megdan-f5985`: анонимен вход; Firestore `(default)` Standard в eur3 (стаи, ходове, чат, профили, статистика); Realtime Database `europe-west1` (присъствие `presence/{стая}/{uid}`, игри на живо `live/{име}/{uid}`).
+- Правила: `firebase/firestore.rules` (профил и статистика пише само собственикът; стаите — всеки влязъл), `firebase/database.rules.json` (всеки пише само своя запис). Качват се с `npx -y firebase-tools@latest deploy --only auth,firestore:rules,database`.
+- Два бъилда от един код чрез `__SITE__`: `dist/index.html` (claude.ai артефакт) и `dist/site/` (сайтът, с og преглед, иконки и manifest).
+- Проверено срещу истинския Firebase: `FIREBASE=1 BASE=https://kaloyan05.github.io/Megdan/ PAGE= node e2e/invite.mjs` и `FIREBASE=1 BASE=… node e2e/live.mjs`.
+
 ## Commands
 ```
 Тестове (логика):  node --test tests/*.test.js
