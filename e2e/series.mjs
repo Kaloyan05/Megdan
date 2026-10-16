@@ -27,7 +27,7 @@ await host.getByRole('button', { name: 'Създай стая' }).click();
 const code = (await host.locator('.code-chip-code').textContent()).trim();
 await guest.fill('#code', code);
 await guest.getByRole('button', { name: 'Влез', exact: true }).click();
-await guest.getByRole('button', { name: 'Готов', exact: true }).click();
+await guest.getByRole('button', { name: 'Не съм готов' }).waitFor(); // влезлият по покана е готов сам
 await host.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent === 'Старт' && !b.disabled));
 await host.getByRole('button', { name: 'Старт' }).click();
 

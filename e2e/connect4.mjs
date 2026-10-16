@@ -40,7 +40,7 @@ await setProfile(p2, 'Мила', 3);
 await p2.fill('#code', code.toLowerCase());
 await p2.getByRole('button', { name: 'Влез', exact: true }).click();
 await p2.locator('.code-chip-code').waitFor();
-await p2.getByRole('button', { name: 'Готов', exact: true }).click();
+await p2.getByRole('button', { name: 'Не съм готов' }).waitFor(); // влезлият по покана е готов сам
 
 await p1.getByRole('button', { name: 'Старт' }).waitFor();
 await p1.waitForFunction(() => !document.querySelector('.btn-primary')?.disabled);

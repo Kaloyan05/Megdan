@@ -37,7 +37,7 @@ async function playGame(name, n, tag) {
   for (const g of guests) {
     await g.fill('#code', code);
     await g.getByRole('button', { name: 'Влез', exact: true }).click();
-    await g.getByRole('button', { name: 'Готов', exact: true }).click();
+    await g.getByRole('button', { name: 'Не съм готов' }).waitFor(); // влезлият по покана е готов сам
   }
   await host.waitForFunction(() => {
     const b = [...document.querySelectorAll('button')].find((x) => x.textContent === 'Старт');

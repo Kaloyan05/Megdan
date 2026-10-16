@@ -7,6 +7,8 @@ import { gameById, playersLabel } from '../games/index.js';
 import { replay } from '../core/engine.js';
 import { activeMembers } from '../net/api.js';
 import { ARTIFACT_URL } from '../config.js';
+import { SITE } from '../env.js';
+import { SITE_URL } from '../site-config.js';
 import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet, optionsControls, optionsSummary } from './sheet.js';
 import { isBot, botMove, BOT_LEVELS } from '../core/bots.js';
 import { seriesTotals, seriesDone, pickSeriesGames } from '../core/series.js';
@@ -99,13 +101,20 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   let lastAnnounce = '';
   const announce = (text) => { if (text && text !== lastAnnounce) { lastAnnounce = text; announcer.textContent = text; } };
 
+  const inviteUrl = () => (SITE ? `${SITE_URL}#${code}` : ARTIFACT_URL ? `${ARTIFACT_URL}#${code}` : '');
   const inviteText = () => {
     const g = gameById(view?.room?.gameId);
-    const link = ARTIFACT_URL ? ` ${ARTIFACT_URL}#${code}` : '';
-    return `Ела да играем${g ? ` ${g.name}` : ''} в Мегдан! Код на стаята: ${code}.${link}`;
+    return SITE
+      ? `Ела да играем${g ? ` ${g.name}` : ''} в Мегдан! Натисни линка, напиши си името и влизаш направо в стаята:`
+      : `Ела да играем${g ? ` ${g.name}` : ''} в Мегдан! Код на стаята: ${code}.`;
   };
-  const copyInvite = () => {
-    const text = inviteText();
+  // На телефона отваря менюто за споделяне (Viber, Messenger, WhatsApp...), иначе копира поканата.
+  const copyInvite = async () => {
+    const url = inviteUrl();
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Мегдан', text: inviteText(), url }); sound.tap(); return; } catch (e) { if (e?.name === 'AbortError') return; }
+    }
+    const text = `${inviteText()} ${url}`.trim();
     try {
       navigator.clipboard.writeText(text).then(() => { toast('Поканата е копирана'); sound.tap(); }, () => showFallback(text));
     } catch { showFallback(text); }
@@ -339,7 +348,12 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const canAddBot = amHost && members.length + botsOf().length < Math.min(game.maxPlayers, 6);
     if (n > game.maxPlayers && !surprise) hint = `${game.name} е за ${playersLabel(game)}. Готови са ${n}.`;
 
+    const alone = members.length < 2;
     return h('section', { class: 'panel setup', 'aria-label': 'Подготовка' },
+      alone && h('div', { class: 'invite-cta' },
+        h('button', { class: 'btn btn-primary btn-big', type: 'button', onClick: copyInvite }, h('span', { 'aria-hidden': 'true', text: '📨' }), h('span', { text: 'Покани приятел' })),
+        h('p', { class: 'hint', text: SITE ? 'Изпрати линка. Приятелят пише името си и влиза направо тук.' : 'Изпрати линка. Приятелят трябва да има профил в claude.ai и покана от теб (Share).' }),
+      ),
       h('div', { class: 'setup-game' },
         h('div', { class: 'game-art setup-art' }, game.art ? game.art() : game.icon),
         h('div', {},
@@ -791,9 +805,17 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   }
 
   // ---- абонаменти ----
+  let autoReadyDone = false;
   const unwatch = api.watchRoom(code, (v) => {
     view = v;
     if (!v.room) { toast('Стаята вече не съществува.'); onLeave(); return; }
+    // Влезлият по покана е „Готов“ веднага: домакинът може да започне без чакане.
+    const mineM = activeMembers(v.members).find((m) => m.id === me);
+    if (!autoReadyDone && mineM && v.room.status === 'lobby' && v.room.hostId !== me && mineM.data.readyFor !== v.room.round + 1) {
+      autoReadyDone = true;
+      api.setReady(code, v.room, v.members, true).catch(() => { autoReadyDone = false; });
+    }
+    if (mineM && v.room.status !== 'lobby') autoReadyDone = true;
     onRoomSeen?.(code);
     update();
     renderChat();

@@ -17,6 +17,7 @@ import { renderLeaderboard } from './ui/leaderboard.js';
 import { createTurnWatcher } from './ui/turns.js';
 import { injectGameCss } from './games/index.js';
 import { sweepRooms, sweepMySecrets } from './net/cleanup.js';
+import { SITE } from './env.js';
 
 const NO_WRITE = 'Нямаш права да играеш тук. Помоли собственика да те покани с право „Can edit“.';
 const appEl = document.getElementById('app');
@@ -108,8 +109,9 @@ async function route() {
   if (!profile || hash === 'profil') {
     const firstTime = !profile;
     document.body.classList.toggle('first-run', firstTime);
+    const joinCode = normalizeCode(hash);
     renderProfile(main, {
-      initial: profile, firstTime,
+      initial: profile, firstTime, joining: firstTime && hash.length === 4 && joinCode.length === 4 ? joinCode : null,
       onSave: async (p) => {
         profile = p;
         storageSet(`profile:${api.me}`, p);
@@ -196,8 +198,11 @@ async function boot() {
     mount(appEl, h('main', { class: 'main' },
       h('div', { class: 'empty' },
         h('h1', { text: 'Мегдан' }),
-        h('p', { text: 'За да играеш, трябва да си влязъл в claude.ai и да имаш покана за тази страница.' }),
-        h('p', { class: 'muted', text: 'Помоли този, който ти прати линка, да те покани с право „Can edit“.' }),
+        ...(SITE
+          ? [h('p', { text: 'Не успях да се свържа. Провери интернета и опитай пак.' }),
+            h('button', { class: 'btn btn-primary', type: 'button', text: 'Опитай пак', onClick: () => location.reload() })]
+          : [h('p', { text: 'За да играеш, трябва да си влязъл в claude.ai и да имаш покана за тази страница.' }),
+            h('p', { class: 'muted', text: 'Помоли този, който ти прати линка, да те покани с право „Can edit“.' })]),
       ),
     ));
     return;

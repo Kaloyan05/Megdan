@@ -67,7 +67,7 @@ async function duo(name, tag, how) {
   const code = (await a.locator('.code-chip-code').textContent()).trim();
   await b.fill('#code', code);
   await b.getByRole('button', { name: 'Влез', exact: true }).click();
-  await b.getByRole('button', { name: 'Готов', exact: true }).click();
+  await b.getByRole('button', { name: 'Не съм готов' }).waitFor(); // влезлият по покана е готов сам
   await a.waitForFunction(() => {
     const x = [...document.querySelectorAll('button')].find((y) => y.textContent === 'Старт');
     return x && !x.disabled;

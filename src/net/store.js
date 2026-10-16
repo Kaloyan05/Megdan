@@ -2,9 +2,17 @@
 
 import { createLocalStore } from './store-local.js';
 import { createClaudeStore } from './store-claude.js';
+/* global __SITE__ */
+import { FIREBASE_CONFIG } from '../site-config.js';
 
 export async function openStore() {
   const params = new URLSearchParams(location.search);
+  // Собственият сайт: Firebase (анонимен вход, без регистрация).
+  if (typeof __SITE__ !== 'undefined' && __SITE__ && params.get('store') !== 'local') {
+    if (!FIREBASE_CONFIG) return null;
+    const { createFirebaseStore } = await import('./store-firebase.js');
+    return createFirebaseStore(FIREBASE_CONFIG).catch((e) => { console.warn('firebase', e); return null; });
+  }
   if (params.get('store') !== 'local') {
     const s = await createClaudeStore().catch(() => null);
     if (s) return s;

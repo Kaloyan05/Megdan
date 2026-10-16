@@ -4,6 +4,7 @@
 
 import { createRng } from '../core/rng.js';
 import { BANK, TOPICS } from './quiz-bank.js';
+import { SITE } from '../env.js';
 
 export const QUESTION_MS = 20000;
 const SKIP_GRACE_MS = 8000;
@@ -75,11 +76,12 @@ export default {
   options: [
     { id: 'topic', label: 'Тема', default: 'general', choices: TOPICS },
     { id: 'count', label: 'Въпроси', default: 10, choices: [{ value: 5, label: '5' }, { value: 10, label: '10' }] },
-    { id: 'source', label: 'Въпросите', default: 'claude', choices: [{ value: 'claude', label: 'От Claude' }, { value: 'bank', label: 'Вградени' }] },
+    // На собствения сайт няма Claude: въпросите са само вградените.
+    ...(SITE ? [] : [{ id: 'source', label: 'Въпросите', default: 'claude', choices: [{ value: 'claude', label: 'От Claude' }, { value: 'bank', label: 'Вградени' }] }]),
   ],
 
   init: (seed, players, opts = {}) => ({
-    seed: String(seed), players: players.slice(), topic: opts.topic ?? 'general', count: opts.count ?? 10, source: opts.source ?? 'claude',
+    seed: String(seed), players: players.slice(), topic: opts.topic ?? 'general', count: opts.count ?? 10, source: opts.source ?? (SITE ? 'bank' : 'claude'),
     phase: 'setup', questions: [], q: 0, answers: [], scores: players.map(() => 0), reveal: null, by: null,
   }),
 

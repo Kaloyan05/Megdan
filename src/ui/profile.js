@@ -11,7 +11,7 @@ export function cleanNick(s) {
   return String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 16);
 }
 
-export function renderProfile(root, { initial, firstTime, onSave, onCancel }) {
+export function renderProfile(root, { initial, firstTime, onSave, onCancel, joining = null }) {
   const draft = {
     nick: initial?.nick ?? '',
     avatar: initial?.avatar ?? AVATARS[Math.floor(Math.random() * AVATARS.length)],
@@ -72,6 +72,7 @@ export function renderProfile(root, { initial, firstTime, onSave, onCancel }) {
       onSave({ nick, avatar: draft.avatar, color: draft.color });
     },
   },
+    joining && h('p', { class: 'join-banner', text: `Канят те в стая ${joining}. Само си напиши името.` }),
     h('h1', { text: firstTime ? 'Как да те наричаме?' : 'Твоят профил' }),
     firstTime && h('p', { class: 'muted', text: 'Избери име и аватар. Приятелите ти ще ги виждат в стаите.' }),
     preview,
@@ -84,7 +85,7 @@ export function renderProfile(root, { initial, firstTime, onSave, onCancel }) {
     h('div', { class: 'field' }, h('span', { class: 'field-label', style: { fontWeight: 700, fontSize: 'var(--step--1)' }, text: 'Аватар' }), avatarGrid),
     h('div', { class: 'field' }, h('span', { style: { fontWeight: 700, fontSize: 'var(--step--1)' }, text: 'Цвят' }), colorGrid),
     h('div', { class: 'actions' },
-      h('button', { class: 'btn btn-primary', type: 'submit', text: firstTime ? 'Към мегдана' : 'Запази' }),
+      h('button', { class: 'btn btn-primary', type: 'submit', text: joining ? 'Влез в играта' : firstTime ? 'Към мегдана' : 'Запази' }),
       !firstTime && h('button', { class: 'btn', type: 'button', text: 'Отказ', onClick: onCancel }),
     ),
   );
