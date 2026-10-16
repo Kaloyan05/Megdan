@@ -1,0 +1,5 @@
+{
+  "auth": { "providers": { "anonymous": true } },
+  "firestore": { "database": "(default)", "location": "eur3", "rules": "firebase/firestore.rules" },
+  "database": { "rules": "firebase/database.rules.json" }
+}
