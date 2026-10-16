@@ -62,6 +62,8 @@ await p2.screenshot({ path: `${out}/04-playing.png`, fullPage: true });
 await p1.getByRole('button', { name: 'Колона 1' }).click();
 
 await p1.getByRole('heading', { name: 'Победа!' }).waitFor();
+await p1.locator('.h2h-chip').waitFor({ timeout: 8000 }).catch(() => {});
+console.log('глава до глава в стаята:', (await p1.locator('.h2h').textContent().catch(() => 'НЯМА')));
 await p2.getByRole('heading', { name: 'Загуба' }).waitFor();
 await p1.waitForTimeout(400);
 await p1.screenshot({ path: `${out}/05-win.png`, fullPage: true });
@@ -96,6 +98,11 @@ await p1.screenshot({ path: `${out}/05c-rooms.png`, fullPage: true });
 await p1.locator('.nav-bottom-item', { hasText: 'Класация' }).click();
 await p1.getByRole('cell', { name: '1016' }).waitFor();
 await p1.screenshot({ path: `${out}/06-leaderboard.png`, fullPage: true });
+await p1.locator('.lb-link').first().click();
+await p1.locator('.versus-total').waitFor();
+console.log('ти срещу:', await p1.locator('.versus-total').textContent());
+await p1.screenshot({ path: `${out}/06b-versus.png` });
+await p1.getByRole('button', { name: 'Затвори' }).click();
 
 // Десктоп + тъмна тема
 const d = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' });

@@ -2,6 +2,30 @@
 
 import { h, mount, avatarEl } from './dom.js';
 import { GAMES } from '../games/index.js';
+import { openSheet } from './sheet.js';
+
+const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// „Ти срещу …“: резултатите ми срещу един играч, общо и по игри.
+function openVersus(name, rec) {
+  const rows = GAMES.filter((g) => rec?.[g.id]).map((g) => ({ name: g.name, ...rec[g.id] }));
+  const all = rec?.all ?? { w: 0, l: 0, d: 0 };
+  openSheet({
+    title: `Ти срещу ${name}`,
+    body: rows.length
+      ? [
+        h('p', { class: 'versus-total num', text: `${all.w} : ${all.l}` }),
+        h('p', { class: 'muted', text: `${pl(all.w, 'победа', 'победи')}, ${pl(all.l, 'загуба', 'загуби')}${all.d ? `, ${pl(all.d, 'равна', 'равни')}` : ''}.` }),
+        h('div', { class: 'table-wrap' }, h('table', { class: 'board-table' },
+          h('thead', {}, h('tr', {}, h('th', { text: 'Игра' }), h('th', { class: 'r', text: 'Победи' }), h('th', { class: 'r', text: 'Загуби' }), h('th', { class: 'r', text: 'Равни' }))),
+          h('tbody', {}, rows.map((r) => h('tr', {},
+            h('td', { text: r.name }), h('td', { class: 'r num', text: String(r.w) }), h('td', { class: 'r num', text: String(r.l) }), h('td', { class: 'r num', text: String(r.d) }),
+          ))),
+        )),
+      ]
+      : h('p', { class: 'muted', text: 'Още не сте играли един срещу друг.' }),
+  });
+}
 
 export function renderLeaderboard(root, { api }) {
   let alive = true;
@@ -10,7 +34,7 @@ export function renderLeaderboard(root, { api }) {
 
   const draw = () => {
     if (!alive) return;
-    const tabs = h('div', { class: 'actions', role: 'group', 'aria-label': 'Игра' },
+    const tabs = h('div', { class: 'actions lb-tabs', role: 'group', 'aria-label': 'Игра' },
       [{ id: 'all', name: 'Общо' }, ...GAMES].map((g) => h('button', {
         type: 'button', class: 'btn btn-small', 'aria-pressed': String(filter === g.id),
         style: filter === g.id ? { background: 'var(--ink)', color: 'var(--bg)' } : null,
@@ -21,6 +45,7 @@ export function renderLeaderboard(root, { api }) {
     let body;
     if (!rows) body = h('p', { class: 'muted', text: 'Зареждам...' });
     else {
+      const mine = rows.find((r) => r.id === api.me)?.stats.h2h ?? {};
       const list = rows
         .map((r) => {
           const g = filter === 'all' ? r.stats : (r.stats.games?.[filter] ?? { w: 0, l: 0, d: 0 });
@@ -38,10 +63,13 @@ export function renderLeaderboard(root, { api }) {
             )),
             h('tbody', {}, list.map((r, i) => h('tr', {},
               h('td', { class: 'num', text: String(i + 1) }),
-              h('td', {}, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px' } },
-                avatarEl(r.profile, 'sm'),
-                h('span', { text: (r.id === api.me ? `${r.profile?.nick ?? 'Ти'} (ти)` : r.profile?.nick) || 'Играч' }),
-              )),
+              h('td', {}, r.id === api.me
+                ? h('span', { class: 'lb-name' }, avatarEl(r.profile, 'sm'), h('span', { text: `${r.profile?.nick ?? 'Ти'} (ти)` }))
+                : h('button', {
+                  class: 'lb-name lb-link', type: 'button', 'aria-label': `${r.profile?.nick || 'Играч'}: ти срещу него`,
+                  onClick: () => openVersus(r.profile?.nick || 'Играч', mine[r.id]),
+                }, avatarEl(r.profile, 'sm'), h('span', { text: r.profile?.nick || 'Играч' }),
+                mine[r.id] && h('span', { class: 'chip', text: `${mine[r.id].all?.w ?? 0}:${mine[r.id].all?.l ?? 0}` }))),
               filter === 'all' && h('td', { class: 'r num', style: { fontWeight: 700 }, text: String(r.stats.rating) }),
               h('td', { class: 'r num', text: String(r.w) }),
               h('td', { class: 'r num', text: String(r.l) }),
@@ -56,7 +84,7 @@ export function renderLeaderboard(root, { api }) {
 
     mount(root,
       h('h1', { text: 'Класация' }),
-      h('p', { class: 'muted', text: 'Всеки започва с 1000 точки. Победа над по-силен носи повече.' }),
+      h('p', { class: 'muted', text: 'Всеки започва с 1000 точки. Победа над по-силен носи повече. Докосни играч, за да видиш как си срещу него.' }),
       tabs,
       h('section', { class: 'panel' }, body),
     );

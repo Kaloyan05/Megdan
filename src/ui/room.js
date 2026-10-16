@@ -70,6 +70,8 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   let botKey = '';
   let botTimer = null;
   let botRevealRound = 0;
+  let myStats = null;
+  const loadMyStats = () => api.getStats().then((st) => { myStats = st; stageKey = ''; if (view?.room) update(); }).catch(() => {});
   const narrow = window.matchMedia('(max-width: 899px)');
 
   // ---- постоянни области ----
@@ -240,6 +242,25 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   }
 
   // ---- сцена ----
+  // „Ти срещу …“: резултатът ми срещу всеки човек в стаята, в тази игра и общо.
+  function h2hRow(gameId) {
+    const others = activeMembers(view.members).map((m) => m.id).filter((id) => id !== me);
+    const rec = myStats?.h2h ?? {};
+    const chips = others.filter((id) => rec[id]).map((id) => {
+      const g = rec[id][gameId] ?? { w: 0, l: 0, d: 0 };
+      const all = rec[id].all ?? { w: 0, l: 0, d: 0 };
+      return h('span', {
+        class: 'h2h-chip',
+        'aria-label': `Срещу ${nickOf(id)} в тази игра: ${g.w} на ${g.l}${g.d ? `, ${g.d} равни` : ''}. Общо: ${all.w} на ${all.l}.`,
+      },
+        h('span', { class: 'h2h-name', text: nickOf(id) }),
+        h('span', { class: 'h2h-score num', text: `${g.w}:${g.l}` }),
+        h('span', { class: 'h2h-all num', text: `общо ${all.w}:${all.l}` }),
+      );
+    });
+    return chips.length ? h('div', { class: 'h2h' }, h('span', { class: 'h2h-label', text: 'Ти срещу' }), chips) : null;
+  }
+
   function lobbyPanel() {
     const room = view.room;
     const game = gameById(room.gameId);
@@ -279,6 +300,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
         )
         : h('p', { class: 'muted', text: `Таймер: ${TIMERS.find((t) => t.sec === (room.timerSec || 0))?.label ?? 'без'}.` }),
       h('p', { class: 'hint', text: hint }),
+      h2hRow(game.id),
       h('div', { class: 'actions' },
         amHost
           ? h('button', {
@@ -355,6 +377,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
         }),
       ),
       h('p', { class: 'hint', text: `${hint} Следваща игра: ${game.name}.` }),
+      h2hRow(game.id),
     );
   }
 
@@ -511,6 +534,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     if (result?.over && room.players.includes(me) && recordedRound !== room.round) {
       recordedRound = room.round;
       api.recordResult(code, room, result, room.gameId).then((r) => {
+        loadMyStats();
         if (r) toast(`Рейтинг ${r.delta >= 0 ? '+' : ''}${r.delta}`);
       }).catch(() => { recordedRound = 0; });
     }
@@ -641,6 +665,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     if (view?.room) renderSeats();
   }).then((p) => { if (destroyed) p.leave(); else presence = p; });
 
+  loadMyStats();
   const clock = setInterval(() => { if (view?.room) { tickTimer(); checkHost(); } }, 500);
   const onKey = (e) => { if (e.key === 'Escape' && chatPanel.classList.contains('open')) setChatOpen(false); };
   document.addEventListener('keydown', onKey);

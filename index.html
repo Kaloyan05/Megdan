@@ -403,6 +403,19 @@ body.first-run .nav-bottom, body.first-run .nav-top { display: none; }
 .turn-banner-count { font: 800 1.4rem/1 var(--f-display); }
 .turn-banner-go { margin-left: auto; text-decoration: underline; white-space: nowrap; }
 
+.lb-tabs { flex-wrap: nowrap; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
+.lb-tabs .btn { flex: none; }
+.lb-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.lb-link { border: 0; background: none; padding: 4px 0; cursor: pointer; font-weight: 700; text-align: left; }
+.lb-link:hover span:not(.chip):not(.avatar) { text-decoration: underline; }
+.versus-total { font: 800 2.4rem/1 var(--f-display); }
+.h2h { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.h2h-label { font-size: var(--step--1); font-weight: 700; color: var(--ink-2); }
+.h2h-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: var(--r-pill); background: var(--surface-2); }
+.h2h-name { font-weight: 700; max-width: 10ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h2h-score { font-weight: 800; }
+.h2h-all { font-size: .75rem; color: var(--ink-2); }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

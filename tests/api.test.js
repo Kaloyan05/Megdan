@@ -121,3 +121,22 @@ test('стая: създай, влез с код, готовност, старт
     close();
   }
 });
+
+test('глава до глава: победи и загуби срещу всеки човек, без ботове', async () => {
+  const { a, b, close } = pair('h2h');
+  try {
+    const code = await a.createRoom({ gameId: 'connect4', profile: { nick: 'Али' } });
+    await b.joinRoom(code, { nick: 'Боби' });
+    await new Promise((r) => setTimeout(r, 30));
+    const room = { players: ['alice', 'bob'], ratings: { alice: 1000, bob: 1000 }, round: 1 };
+    await a.recordResult(code, room, { over: true, placements: { alice: 1, bob: 2 } }, 'connect4');
+    await a.recordResult(code, { ...room, round: 2 }, { over: true, placements: { alice: 2, bob: 1 } }, 'reversi');
+    await a.recordResult(code, { ...room, round: 3 }, { over: true, placements: { alice: 1, bob: 2 } }, 'connect4');
+    const st = await a.getStats('alice');
+    assert.deepEqual(st.h2h.bob.all, { w: 2, l: 1, d: 0 });
+    assert.deepEqual(st.h2h.bob.connect4, { w: 2, l: 0, d: 0 });
+    // партия с бот не се брои
+    await a.recordResult(code, { players: ['alice', 'bot-1'], ratings: {}, round: 4 }, { over: true, placements: { alice: 1, 'bot-1': 2 } }, 'connect4');
+    assert.equal((await a.getStats('alice')).h2h['bot-1'], undefined);
+  } finally { close(); }
+});

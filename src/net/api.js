@@ -268,6 +268,17 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       }
       const g = { w: 0, l: 0, d: 0, ...(stats.games?.[gameId] ?? {}) };
       g[outcome] += 1;
+      // Глава до глава: сравнение на местата с всеки друг човек в партидата.
+      const h2h = { ...(stats.h2h ?? {}) };
+      for (const other of room.players) {
+        if (other === me) continue;
+        const res = myPlace < result.placements[other] ? 'w' : myPlace > result.placements[other] ? 'l' : 'd';
+        const rec = { all: { w: 0, l: 0, d: 0 }, ...(h2h[other] ?? {}) };
+        rec.all = { ...rec.all, [res]: (rec.all[res] ?? 0) + 1 };
+        const pg = { w: 0, l: 0, d: 0, ...(rec[gameId] ?? {}) };
+        pg[res] += 1;
+        h2h[other] = { ...rec, [gameId]: pg };
+      }
       const next = {
         ...stats,
         rating: (stats.rating ?? START_RATING) + (deltas[me] ?? 0),
@@ -275,6 +286,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
         l: (stats.l ?? 0) + (outcome === 'l'),
         d: (stats.d ?? 0) + (outcome === 'd'),
         games: { ...(stats.games ?? {}), [gameId]: g },
+        h2h,
         played: [...(stats.played ?? []), key].slice(-PLAYED_KEEP),
         updatedAt: now(),
       };
