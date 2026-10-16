@@ -1,7 +1,9 @@
 # Мегдан
 
 Мултиплейър мини игри за приятели: стаи с 4-буквен код, ходови игри, чат, ELO класация.
-Живее като публикуван артефакт в claude.ai: https://claude.ai/artifact/46Gt4GYPKn9nDFjjVayBvA
+Две версии от един и същ код:
+- **Сайт (основната):** https://kaloyan05.github.io/Megdan/ — без регистрация, приятелят натиска линка, пише име и е в стаята. Данни: Firebase (проект `megdan-f5985`).
+- **Артефакт в claude.ai:** https://claude.ai/artifact/46Gt4GYPKn9nDFjjVayBvA — изисква вход в claude.ai.
 
 Игри (16): Четири в редица, Реверси, Точки и кутийки, Цветна осмица (с +4 и „Последна карта!“), Ултимат морски шах, Покер със зарове, Мемори, Не се сърди човече, Табла, Морски бой, Мини голф, Дама, Викторина, Реакция-рали, а на живо: Понг и Въздушен хокей.
 
@@ -9,6 +11,9 @@
 
 ## Как да поканиш приятел
 
+**На сайта:** в стаята натисни „Покани приятел“ и прати линка (Viber, Messenger…). Приятелят пише името си и влиза направо в стаята, вече „Готов“.
+
+**В артефакта в claude.ai:**
 1. Отвори артефакта и натисни **Share**.
 2. Покани приятеля **по имейл с право „Can edit“**. Хората извън твоята организация пишат в базата само с това право.
 3. **Не включвай „Anyone with the link“.** Докато има публичен линк, поканените отвън не могат да пишат.
@@ -29,6 +34,18 @@ node e2e/connect4.mjs    # стая, код, реванш, презарежда�
 ```
 
 С `?store=local` всичко работи без claude.ai: данните са в localStorage, а табовете се синхронизират през BroadcastChannel.
+
+## Сайтът (GitHub Pages + Firebase)
+
+```
+npm run build && ./deploy.sh   # строи dist/site/ и го качва в клона gh-pages
+```
+
+- `src/site-config.js`: адресът на сайта и firebaseConfig. `build.mjs` прави два бъилда с флага `__SITE__`.
+- `src/net/store-firebase.js`: анонимен вход (постоянен uid на устройство), Firestore за документите, Realtime Database за присъствие и игрите на живо.
+- Правилата са във `firebase/`: `firestore.rules` и `database.rules.json` — копират се в конзолата на Firebase.
+- Нужно във Firebase: Authentication → Anonymous; Firestore; Realtime Database (europe-west1, иначе смени `databaseURL`).
+- `FIREBASE=1 BASE=https://kaloyan05.github.io/Megdan/ PAGE= node e2e/invite.mjs` проверява поканата срещу истинския Firebase.
 
 ## Структура
 
