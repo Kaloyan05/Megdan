@@ -167,8 +167,15 @@ export default {
       cell.addEventListener('click', () => ctx.onMove({ cell: i }));
       if (v !== null) {
         const disc = document.createElement('span');
-        disc.className = 'rv-disc' + (flipped.has(i) ? ' flip' : '') + (i === s.last ? ' last' : '');
+        const fresh = Boolean(ctx.last?.fresh);
+        disc.className = 'rv-disc' + (fresh && flipped.has(i) ? ' flip' : '') + (i === s.last ? ' last' : '') + (fresh && i === s.last ? ' fx-pop' : '');
         disc.style.setProperty('--disc', `var(--seat-${v + 1})`);
+        if (fresh && flipped.has(i) && s.last !== null) {
+          // Обръщат се една след друга, като вълна от новия диск.
+          const d = Math.max(Math.abs((i % N) - (s.last % N)), Math.abs(Math.floor(i / N) - Math.floor(s.last / N)));
+          disc.style.setProperty('--from', `var(--seat-${(1 - v) + 1})`);
+          disc.style.animationDelay = `${120 + d * 90}ms`;
+        }
         cell.append(disc);
       }
       grid.append(cell);
@@ -192,17 +199,28 @@ export default {
 .rv-score { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:center; margin-bottom:10px; font-weight:700; font-variant-numeric:tabular-nums; }
 .rv-score-item { display:inline-flex; align-items:center; gap:6px; }
 .rv-note { width:100%; text-align:center; font-weight:500; color:var(--ink-2); font-size:var(--step--1); }
-.rv { display:grid; grid-template-columns:repeat(8,1fr); gap:2px; padding:6px; width:min(100%,440px); margin-inline:auto;
-  background:var(--felt-edge); border-radius:var(--r-lg); box-shadow:var(--shadow-pop); }
-.rv-cell { aspect-ratio:1; border:0; padding:0; background:var(--felt); border-radius:4px; display:grid; place-items:center; cursor:default; }
+.rv { display:grid; grid-template-columns:repeat(8,1fr); gap:2px; padding:8px; width:min(100%,440px); margin-inline:auto; border-radius:var(--r-lg);
+  background:linear-gradient(160deg, color-mix(in srgb, var(--felt-edge) 85%, #fff), var(--felt-edge) 40%, color-mix(in srgb, var(--felt-edge) 75%, #000));
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / .2), 0 7px 0 color-mix(in srgb, var(--felt-edge) 55%, #000), 0 14px 22px rgb(0 0 0 / .25); perspective:500px; }
+.rv-cell { aspect-ratio:1; border:0; padding:0; border-radius:3px; display:grid; place-items:center; cursor:default;
+  background:radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--felt) 90%, #fff), var(--felt) 55%, color-mix(in srgb, var(--felt) 85%, #000));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .3); }
 .rv-cell.hint { cursor:pointer; }
-.rv-cell.hint::after { content:""; width:28%; height:28%; border-radius:50%; background:rgb(255 255 255 / .35); }
+.rv-cell.hint::after { content:""; width:28%; height:28%; border-radius:50%; background:rgb(255 255 255 / .35); box-shadow:inset 0 1px 2px rgb(0 0 0 / .3); }
 .rv-cell.hint:hover::after, .rv-cell.hint:focus-visible::after { background:rgb(255 255 255 / .7); }
 .rv-cell:focus-visible { outline:3px solid var(--sun); outline-offset:-3px; }
-.rv-disc { width:82%; height:82%; border-radius:50%; background:var(--disc); box-shadow:inset 0 -3px 0 rgb(0 0 0 / .25); }
-.rv-disc.last { box-shadow:inset 0 -3px 0 rgb(0 0 0 / .25), 0 0 0 3px var(--sun); }
-.rv-disc.flip { animation:rvflip .35s ease-out; }
-@keyframes rvflip { 0% { transform:scaleX(1); } 50% { transform:scaleX(0); } 100% { transform:scaleX(1); } }
+.rv-disc { --face: radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--disc) 45%, #fff) 0 10%, var(--disc) 50%, color-mix(in srgb, var(--disc) 72%, #000) 100%);
+  width:82%; height:82%; border-radius:50%; background:var(--face);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--disc) 70%, #000), 0 3px 0 color-mix(in srgb, var(--disc) 45%, #000), 0 5px 5px rgb(0 0 0 / .35); }
+.rv-disc.last { outline:3px solid var(--sun); outline-offset:1px; }
+/* Обръщане: първата половина е в стария цвят, втората в новия. */
+.rv-disc.flip { animation:rvflip .5s cubic-bezier(.4,0,.2,1) both; }
+@keyframes rvflip {
+  0% { transform:rotateY(0) translateY(0); background:radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--from) 45%, #fff) 0 10%, var(--from) 50%, color-mix(in srgb, var(--from) 72%, #000) 100%); }
+  49% { transform:rotateY(90deg) translateY(-6px); background:radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--from) 45%, #fff) 0 10%, var(--from) 50%, color-mix(in srgb, var(--from) 72%, #000) 100%); }
+  51% { transform:rotateY(90deg) translateY(-6px); background:var(--face); }
+  100% { transform:rotateY(0) translateY(0); background:var(--face); }
+}
 .rv-art { display:grid; grid-template-columns:repeat(4,20px); gap:2px; padding:4px; background:var(--felt-edge); border-radius:10px; }
 .rv-art span { width:20px; height:20px; background:var(--felt); border-radius:3px; display:grid; place-items:center; }
 .rv-art i { width:15px; height:15px; border-radius:50%; }

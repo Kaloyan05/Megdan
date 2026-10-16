@@ -242,14 +242,17 @@ export default {
     // ---- стрелба ----
     const mySeat = seat < 0 ? 0 : seat;
     const myTurn = !ctx.over && seat === s.turn && s.phase === 'shoot';
+    // Ефект върху клетката на току-що отговорения изстрел: пръски при пропуск, взрив при попадение.
+    const fx = ctx.last?.fresh && s.last?.kind === 'answer' ? { cell: s.last.cell, cls: s.last.sunk ? 'fx-sunk' : s.last.hit ? 'fx-boom' : 'fx-splash', shooter: s.last.seat } : null;
+    const fxFor = (shooter) => (fx && fx.shooter === shooter ? fx : null);
     const target = targetGrid(s.shots[mySeat], myTurn, (cell) => ctx.onMove({ type: 'shot', cell }), make,
-      seat < 0 ? `Изстрели на ${ctx.nickOf(s.players[0])}` : 'Флотът на противника', s.pending !== null && s.turn === mySeat ? s.pending : null);
+      seat < 0 ? `Изстрели на ${ctx.nickOf(s.players[0])}` : 'Флотът на противника', s.pending !== null && s.turn === mySeat ? s.pending : null, fxFor(mySeat));
     const msg = make('p', 'c8-msg', lastText(s, ctx, seat));
     const score = make('p', 'bs-score num', s.players.map((p, i) => `${ctx.nickOf(p)}: ${s.hits[i]}/${TOTAL}`).join('   '));
     el.append(score, msg, target);
     if (seat >= 0) {
       const incoming = s.shots[1 - seat];
-      el.append(make('h3', 'bs-h', 'Твоят флот'), gridOf(secret?.ships ?? [], incoming, make, 'Твоят флот', true, s.pending !== null && s.turn !== seat ? s.pending : null));
+      el.append(make('h3', 'bs-h', 'Твоят флот'), gridOf(secret?.ships ?? [], incoming, make, 'Твоят флот', true, s.pending !== null && s.turn !== seat ? s.pending : null, fxFor(1 - seat)));
     }
 
     // ---- проверка накрая ----
@@ -273,19 +276,31 @@ export default {
   css: `
 .bs-place { display:grid; gap:12px; justify-items:center; width:100%; }
 .bs-board-wrap { width:100%; }
-.bs-grid { display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:2px; width:min(100%,400px); margin-inline:auto; padding:5px;
-  background:color-mix(in srgb, var(--focus) 55%, var(--ink)); border-radius:var(--r-md); }
+.bs-grid { display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:2px; width:min(100%,400px); margin-inline:auto; padding:6px;
+  background:linear-gradient(160deg,#2b4f7e,#18304f); border-radius:var(--r-md); box-shadow: inset 0 2px 0 rgb(255 255 255 / .15), 0 6px 0 #10223a, 0 12px 20px rgb(0 0 0 / .25); }
 .bs-grid.small { width:min(100%,280px); }
-.bs-cell { aspect-ratio:1; border:0; padding:0; border-radius:3px; background:color-mix(in srgb, var(--focus) 22%, var(--surface)); display:grid; place-items:center;
+/* Вода: леко вълниста, кораби от стомана. */
+.bs-cell { aspect-ratio:1; border:0; padding:0; border-radius:3px; display:grid; place-items:center; position:relative; overflow:visible;
+  background: radial-gradient(80% 60% at 30% 25%, rgb(255 255 255 / .35), transparent 60%), linear-gradient(160deg,#7fb6e6,#4f8fcf);
   font:800 .8rem/1 var(--f-body); color:var(--ink); }
-.bs-cell.ship { background:var(--ink-2); }
-.bs-cell.hit { background:var(--accent); color:#fff; }
-.bs-cell.hit::after { content:"✕"; }
-.bs-cell.miss::after { content:""; width:28%; height:28%; border-radius:50%; background:var(--ink-2); }
-.bs-cell.near { background:color-mix(in srgb, var(--focus) 10%, var(--surface)); }
-.bs-cell.sunk { background:var(--ink); color:#fff; }
+.bs-cell.ship { background:linear-gradient(180deg,#9aa6b5,#5f6b7a 55%,#465160); box-shadow:inset 0 1px 0 rgb(255 255 255 / .35), inset 0 -2px 0 rgb(0 0 0 / .3); }
+.bs-cell.hit { background:radial-gradient(circle at 50% 50%, #ffcf5a 0 18%, #ff6a3a 40%, #b5261a 80%); color:#fff; }
+.bs-cell.hit::after { content:"✕"; text-shadow:0 1px 1px rgb(0 0 0 / .5); }
+.bs-cell.miss::after { content:""; width:30%; height:30%; border-radius:50%; background:rgb(255 255 255 / .85); box-shadow:0 0 0 3px rgb(255 255 255 / .25); }
+.bs-cell.near { background:linear-gradient(160deg,#a9cdee,#86b3dc); }
+.bs-cell.sunk { background:linear-gradient(180deg,#3a4250,#1d2433); color:#ff8a6a; }
 .bs-cell.sunk::after { content:"✕"; }
-.bs-cell.pending { box-shadow:inset 0 0 0 3px var(--sun); }
+.bs-cell.pending { box-shadow:inset 0 0 0 3px var(--sun); animation: bsAim .8s ease-in-out infinite alternate; }
+@keyframes bsAim { to { box-shadow:inset 0 0 0 3px var(--sun), 0 0 0 4px rgb(255 199 67 / .45); } }
+/* Пръски и взрив: кръг, който се разширява от клетката. */
+.bs-cell.fx-splash::before, .bs-cell.fx-boom::before, .bs-cell.fx-sunk::before { content:''; position:absolute; inset:-60%; border-radius:50%; pointer-events:none; z-index:2; }
+.bs-cell.fx-splash::before { border:3px solid rgb(255 255 255 / .9); animation: bsRing .7s ease-out forwards; }
+.bs-cell.fx-boom::before, .bs-cell.fx-sunk::before { background:radial-gradient(circle, #fff6c2 0 12%, #ffb23a 30%, rgb(255 80 40 / .7) 50%, transparent 70%); animation: bsBoom .7s ease-out forwards; }
+.bs-cell.fx-boom, .bs-cell.fx-sunk { animation: bsShake .4s ease-in-out; }
+@keyframes bsRing { from { transform:scale(.2); opacity:1; } to { transform:scale(1.4); opacity:0; } }
+@keyframes bsBoom { from { transform:scale(.2); opacity:1; } 60% { opacity:.9; } to { transform:scale(1.7); opacity:0; } }
+@keyframes bsShake { 20% { transform:translate(-2px,1px); } 40% { transform:translate(2px,-1px); } 60% { transform:translate(-1px,-1px); } 80% { transform:translate(1px,1px); } }
+@media (prefers-reduced-motion: reduce) { .bs-cell.pending, .bs-cell.fx-boom, .bs-cell.fx-sunk { animation:none; } .bs-cell::before { display:none; } }
 button.bs-cell { cursor:pointer; }
 button.bs-cell:disabled { cursor:default; }
 button.bs-cell:not(:disabled):hover { background:var(--sun); }
@@ -301,7 +316,7 @@ button.bs-cell:not(:disabled):hover { background:var(--sun); }
 `,
 };
 
-function gridOf(ships, incoming, make, label, small = false, pending = null) {
+function gridOf(ships, incoming, make, label, small = false, pending = null, fx = null) {
   const own = new Set(ships.flat());
   const hits = new Map(incoming.map((x) => [x.cell, x.hit]));
   const g = make('div', 'bs-grid' + (small ? ' small' : ''));
@@ -313,12 +328,13 @@ function gridOf(ships, incoming, make, label, small = false, pending = null) {
     if (hits.get(i) === true) c.classList.add('hit');
     else if (hits.has(i)) c.classList.add('miss');
     if (i === pending) c.classList.add('pending');
+    if (fx?.cell === i) c.classList.add(fx.cls);
     g.append(c);
   }
   return g;
 }
 
-function targetGrid(myShots, canShoot, onShot, make, label, pending) {
+function targetGrid(myShots, canShoot, onShot, make, label, pending, fx = null) {
   const known = new Map(myShots.map((x) => [x.cell, x]));
   const sunkCells = new Set(myShots.flatMap((x) => x.sunk ?? []));
   const near = new Set();
@@ -335,6 +351,7 @@ function targetGrid(myShots, canShoot, onShot, make, label, pending) {
     else if (shot) b.classList.add('miss');
     else if (near.has(i)) b.classList.add('near');
     if (i === pending) b.classList.add('pending');
+    if (fx?.cell === i) b.classList.add(fx.cls);
     b.disabled = !canShoot || Boolean(shot) || i === pending;
     b.setAttribute('aria-label', `${cellName(i)}${sunkCells.has(i) ? ', потопен' : shot?.hit ? ', попадение' : shot ? ', пропуск' : ''}`);
     b.addEventListener('click', () => onShot(i));

@@ -187,7 +187,7 @@ export default {
         const v = s.board[i];
         if (v !== null) {
           const disc = document.createElement('span');
-          disc.className = 'disc' + (i === s.last ? ' drop' : '') + (win.has(i) ? ' win' : '');
+          disc.className = 'disc' + (i === s.last && ctx.last?.fresh ? ' drop' : '') + (i === s.last ? ' last' : '') + (win.has(i) ? ' win' : '');
           disc.style.setProperty('--disc', `var(--seat-${v + 1})`);
           disc.style.setProperty('--rows', ROWS - r);
           cell.append(disc);
@@ -216,21 +216,27 @@ export default {
 .c4-art { display:grid; grid-template-columns:repeat(4,18px); gap:5px; padding:8px; background:var(--board); border-radius:12px; }
 .c4-art span { width:18px; height:18px; border-radius:50%; background:var(--board-hole); }
 .c4 { display:grid; grid-template-columns:repeat(var(--c4-cols, 7),minmax(0,1fr)); gap:clamp(3px,1.2vw,8px);
-  background:var(--board); padding:clamp(6px,2vw,12px); border-radius:var(--r-lg);
-  width:min(100%,440px); margin-inline:auto; box-shadow:var(--shadow-pop); }
+  padding:clamp(8px,2.4vw,14px); border-radius:var(--r-lg); width:min(100%,440px); margin-inline:auto;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--board) 82%, #fff), var(--board) 18%, var(--board) 80%, color-mix(in srgb, var(--board) 78%, #000));
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / .35), inset 0 -4px 0 rgb(0 0 0 / .25), 0 8px 0 color-mix(in srgb, var(--board) 55%, #000), 0 16px 24px rgb(0 0 0 / .25); }
 .c4-col { display:flex; flex-direction:column; gap:clamp(3px,1.2vw,8px); border:0; padding:0;
   background:transparent; cursor:pointer; border-radius:999px; }
 .c4-col:disabled { cursor:default; }
 .c4-col:not(:disabled):hover .c4-cell, .c4-col:focus-visible .c4-cell { background:var(--board-hole-hi); }
 .c4-col:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-.c4-cell { aspect-ratio:1; border-radius:50%; background:var(--board-hole); display:grid; overflow:hidden; }
-.disc { border-radius:50%; background:var(--disc); box-shadow:inset 0 -4px 0 rgb(0 0 0 / .18); }
-.disc.drop { animation:c4drop calc(.12s + var(--rows) * .05s) cubic-bezier(.5,0,.75,0) both,
-  c4bounce .25s calc(.12s + var(--rows) * .05s) ease-out; }
+.c4-cell { aspect-ratio:1; border-radius:50%; background:var(--board-hole); display:grid; position:relative;
+  box-shadow: inset 0 3px 6px rgb(0 0 0 / .35), 0 1px 0 rgb(255 255 255 / .25); }
+/* Диск: обемен, с вдлъбнат пръстен. При пускане пада видимо през празните дупки. */
+.disc { border-radius:50%; position:relative; z-index:1;
+  background:radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--disc) 45%, #fff) 0 10%, var(--disc) 45%, color-mix(in srgb, var(--disc) 75%, #000) 100%);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--disc) 72%, #000), inset 0 0 0 6px color-mix(in srgb, var(--disc) 80%, #fff), inset 0 0 0 8px color-mix(in srgb, var(--disc) 85%, #000), 0 2px 3px rgb(0 0 0 / .35); }
+.disc.drop { z-index:3; animation:c4drop calc(.14s + var(--rows) * .055s) cubic-bezier(.5,0,.75,0) both,
+  c4bounce .3s calc(.14s + var(--rows) * .055s) ease-out; }
+.disc.last:not(.drop)::after { content:''; position:absolute; inset:34%; border-radius:50%; background:rgb(255 255 255 / .55); }
 .disc.win { animation:c4win .8s ease-in-out infinite alternate; }
 @keyframes c4drop { from { transform:translateY(calc(var(--rows) * -115%)); } }
-@keyframes c4bounce { 40% { transform:translateY(-12%); } }
-@keyframes c4win { to { transform:scale(.82); box-shadow:0 0 0 4px var(--bg) inset; } }
+@keyframes c4bounce { 35% { transform:translateY(-14%) scaleY(1.04); } 60% { transform:translateY(0) scaleY(.94); } 80% { transform:translateY(-3%); } }
+@keyframes c4win { to { transform:scale(.84); filter:brightness(1.25); } }
 @media (prefers-reduced-motion: reduce) { .disc.drop, .disc.win { animation:none; } }
 `,
 };

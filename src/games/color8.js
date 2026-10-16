@@ -211,15 +211,34 @@ export default {
     const myTurn = !ctx.over && meSeat === s.turn;
     el.innerHTML = '';
     const make = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const lm = ctx.last?.fresh ? ctx.last : null;
+    const actorSeat = lm ? s.players.indexOf(lm.actor) : -1;
+    const fromOf = (seat) => (seat === meSeat ? 'c8-hand' : `c8-opp-${seat}`);
+    // Кои карти са нови в ръката ми (изтеглени): сравнявам с предишния рендер.
+    const sc = ctx.scratch ?? {};
+    const myHand = meSeat >= 0 ? s.hands[meSeat] : [];
+    const newIds = new Set(lm && sc.prevHand ? myHand.filter((id) => !sc.prevHand.includes(id)) : []);
+    const prevCounts = sc.prevCounts ?? s.hands.map((h) => h.length);
+    sc.prevHand = myHand.slice();
+    sc.prevCounts = s.hands.map((h) => h.length);
 
     // съперници
     const opp = make('div', 'c8-opps');
     s.players.forEach((p, i) => {
       if (i === meSeat) return;
       const o = make('div', 'c8-opp' + (i === s.turn && !ctx.over ? ' turn' : ''));
+      o.dataset.fx = `c8-opp-${i}`;
+      o.style.setProperty('--seat', `var(--seat-${i + 1})`);
       o.append(make('span', 'c8-opp-name', ctx.nickOf(p)));
       const fan = make('span', 'c8-fan');
-      for (let k = 0; k < Math.min(s.hands[i].length, 8); k++) fan.append(make('i'));
+      const shown = Math.min(s.hands[i].length, 8);
+      const gained = lm ? Math.max(0, s.hands[i].length - (prevCounts[i] ?? s.hands[i].length)) : 0;
+      for (let k = 0; k < shown; k++) {
+        const card = make('i');
+        // Изтеглени карти: летят от тестето към съперника.
+        if (k >= shown - gained) { card.dataset.fxFrom = 'c8-pile'; card.dataset.fxDelay = String((k - (shown - gained)) * 90); }
+        fan.append(card);
+      }
       o.append(fan, make('span', 'c8-count', s.hands[i].length === 1 ? '1 карта!' : `${s.hands[i].length} карти`));
       opp.append(o);
     });
@@ -228,17 +247,24 @@ export default {
     const table = make('div', 'c8-table');
     const drawBtn = make('button', 'c8-pile');
     drawBtn.type = 'button';
+    drawBtn.dataset.fx = 'c8-pile';
     drawBtn.disabled = !myTurn || s.pending !== null || (!s.owed && !canDrawAny(s));
     drawBtn.setAttribute('aria-label', s.owed ? `Тегли ${s.owed} карти` : `Тегли карта. В тестето има ${s.draw.length}`);
     drawBtn.append(make('span', 'c8-back'), make('span', 'c8-pile-n', s.owed ? `+${s.owed}` : String(s.draw.length)));
     drawBtn.addEventListener('click', () => ctx.onMove({ type: 'draw' }));
     const topCard = cardEl(top(s), make);
     topCard.classList.add('c8-top');
+    // Малко наклон, като истинска купчина; изиграната карта долита от ръката на играча.
+    topCard.style.setProperty('--tilt', `${((top(s) * 37) % 13) - 6}deg`);
+    const under = make('span', 'c8-under');
+    const discardWrap = make('span', 'c8-discard');
+    discardWrap.append(under, topCard);
+    if (lm?.move?.type === 'play' && actorSeat >= 0) { topCard.dataset.fxFrom = fromOf(actorSeat); topCard.classList.add('c8-landed'); }
     topCard.setAttribute('aria-label', `Горна карта: ${describe(top(s))}. Цвят: ${COLORS[s.color]}`);
     const ring = make('div', 'c8-color');
     ring.style.setProperty('--c', `var(--seat-${[1, 2, 3, 4][s.color]})`);
     ring.append(make('span', null, COLORS[s.color]));
-    table.append(drawBtn, topCard, ring);
+    table.append(drawBtn, discardWrap, ring);
 
     // съобщение
     const msg = make('p', 'c8-msg', lastText(s, ctx));
@@ -248,6 +274,7 @@ export default {
     let called = false;
     if (meSeat >= 0) {
       const hand = make('div', 'c8-hand' + (myTurn ? ' my-turn' : ''));
+      hand.dataset.fx = 'c8-hand';
       hand.setAttribute('aria-label', 'Твоите карти');
       const sorted = s.hands[meSeat].slice().sort((a, b) => card(a).color - card(b).color || KINDS.indexOf(card(a).kind) - KINDS.indexOf(card(b).kind));
       for (const id of sorted) {
@@ -257,6 +284,7 @@ export default {
         b.classList.add('c8-in-hand');
         if (playable) b.classList.add('playable');
         if (id === s.pending) b.classList.add('drawn');
+        if (newIds.has(id)) { b.dataset.fxFrom = 'c8-pile'; b.dataset.fxDelay = String([...newIds].indexOf(id) * 90); }
         b.disabled = !playable;
         b.setAttribute('aria-label', describe(id) + (playable ? ', изиграй' : ''));
         b.addEventListener('click', () => {
@@ -335,7 +363,14 @@ export default {
   css: `
 .c8-opps { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%; }
 .c8-opp { display:grid; justify-items:center; gap:2px; padding:8px 12px; border-radius:var(--r-md); background:var(--surface); border:2px solid var(--line); min-width:0; }
-.c8-opp.turn { border-color:var(--ink); box-shadow:0 3px 0 var(--ink); }
+.c8-opp { transition: transform .25s cubic-bezier(.2,1.4,.4,1), border-color .25s, background-color .25s; }
+.c8-opp.turn { border-color:var(--seat); background:color-mix(in srgb, var(--seat) 14%, var(--surface)); box-shadow:0 0 0 3px color-mix(in srgb, var(--seat) 28%, transparent), 0 3px 0 var(--seat); transform:translateY(-2px); }
+.c8-discard { position:relative; display:grid; }
+.c8-discard > * { grid-area:1/1; }
+.c8-under { width:76px; height:108px; border-radius:10px; background:#fff; transform:rotate(7deg) translate(4px,2px); box-shadow:0 2px 6px rgb(0 0 0 / .25), -3px -2px 0 -1px #e9e4d8; }
+.c8-top { transform:rotate(var(--tilt, 0deg)); box-shadow:0 3px 0 rgb(0 0 0 / .18), 0 10px 18px rgb(0 0 0 / .3); }
+.c8-top.c8-landed { animation: c8land .5s cubic-bezier(.2,1.3,.4,1) .05s backwards; }
+@keyframes c8land { from { rotate: 18deg; scale: 1.15; } }
 .c8-opp-name { font-weight:700; max-width:10ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .c8-fan { display:flex; height:26px; }
 .c8-fan i { width:16px; height:24px; margin-left:-7px; border-radius:4px; background:var(--board); border:2px solid var(--surface); }
@@ -352,10 +387,12 @@ export default {
 .c8-card { --c: var(--seat-1); width:64px; height:92px; flex:none; border-radius:10px; border:3px solid #fff; background:var(--c); color:#fff;
   display:grid; place-items:center; font:800 1.6rem/1 var(--f-display); text-shadow:0 2px 0 rgb(0 0 0 / .25); box-shadow:0 4px 0 rgb(0 0 0 / .25); position:relative; }
 .c8-card .corner { position:absolute; top:5px; left:7px; font-size:.75rem; }
+.c8-card::before { content:''; position:absolute; inset:0; border-radius:7px; pointer-events:none;
+  background:linear-gradient(140deg, rgb(255 255 255 / .32), rgb(255 255 255 / 0) 38%, rgb(0 0 0 / 0) 70%, rgb(0 0 0 / .12)); }
 .c8-card.light { color:#1b2333; text-shadow:none; }
 .c8-card.wild { background:conic-gradient(var(--seat-1) 0 25%, var(--seat-2) 0 50%, var(--seat-3) 0 75%, var(--seat-4) 0); }
 .c8-card.wild .val { background:#fff; color:#1b2333; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; text-shadow:none; }
-.c8-top { width:76px; height:108px; font-size:2rem; animation:c8in .25s ease-out; }
+.c8-top { width:76px; height:108px; font-size:2rem; }
 @keyframes c8in { from { transform:translateY(-14px) rotate(-8deg); opacity:.4; } }
 .c8-color { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; background:var(--c); color:#fff; font-weight:700; font-size:.75rem; box-shadow:inset 0 0 0 4px rgb(255 255 255 / .6); text-shadow:0 1px 0 rgb(0 0 0 / .3); }
 .c8-msg { text-align:center; min-height:1.5em; color:var(--ink-2); font-weight:500; }
@@ -381,7 +418,7 @@ export default {
 .c8-art span:first-child { margin-left:0; transform:rotate(-8deg); }
 .c8-art span:last-child { transform:rotate(8deg); }
 .c8-art .wild { background:conic-gradient(var(--seat-1) 0 25%, var(--seat-2) 0 50%, var(--seat-3) 0 75%, var(--seat-4) 0); }
-@media (prefers-reduced-motion: reduce) { .c8-top { animation:none; } .c8-in-hand { transition:none; } }
+@media (prefers-reduced-motion: reduce) { .c8-top { animation:none !important; } .c8-in-hand { transition:none; } }
 `,
 };
 
