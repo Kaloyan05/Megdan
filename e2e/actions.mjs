@@ -76,5 +76,12 @@ export const ACT = {
     const cards = p.locator('.mm-card:not([disabled])');
     await cards.nth(Math.floor(Math.random() * (await cards.count()))).click();
   },
+  'Дама': async (p) => {
+    const tgt = p.locator('.ck-cell.tgt');
+    if (await tgt.count()) return tgt.nth(Math.floor(Math.random() * (await tgt.count()))).click();
+    const src = p.locator('.ck-cell.src');
+    await src.nth(Math.floor(Math.random() * (await src.count()))).click();
+    await p.waitForTimeout(30);
+    if (await tgt.count()) await tgt.first().click();
+  },
 };
-
