@@ -190,9 +190,9 @@ export default {
     const make = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const sc = ctx.scratch ?? {};
     el.innerHTML = '';
-    clearTimeout(sc.timer); clearTimeout(sc.skipTimer);
+    clearTimeout(sc.timer); clearTimeout(sc.skipTimer); clearInterval(sc.tick);
 
-    const score = make('div', 'rv-score');
+    const score = make('div', 'rv-score qz-score');
     s.players.forEach((p, i) => {
       const item = make('span', 'rv-score-item');
       const dot = make('span', 'disc-dot');
@@ -213,9 +213,14 @@ export default {
     // какво стана с предишния въпрос
     if (s.reveal) {
       const prev = s.questions[s.reveal.q];
-      const r = make('div', 'qz-reveal');
-      r.append(make('p', null, `Отговор: ${LETTERS[s.reveal.correct]}. ${prev.a[s.reveal.correct]}`),
-        make('p', 'muted', s.reveal.right.length ? `Познаха: ${s.reveal.right.map(ctx.nickOf).join(', ')}` : 'Никой не позна.'));
+      const iWasRight = s.reveal.right.includes(ctx.me);
+      const played = s.players.includes(ctx.me);
+      const r = make('div', `qz-reveal${ctx.last?.fresh ? ' fx-pop' : ''}${played ? (iWasRight ? ' right' : ' wrong') : ''}`);
+      r.append(make('span', 'qz-reveal-mark', played ? (iWasRight ? '✓' : '✕') : '•'),
+        make('div', null),
+      );
+      r.lastChild.append(make('p', null, `Отговор: ${LETTERS[s.reveal.correct]}. ${prev.a[s.reveal.correct]}`),
+        make('p', 'qz-reveal-who', s.reveal.right.length ? `Познаха: ${s.reveal.right.map(ctx.nickOf).join(', ')}` : 'Никой не позна.'));
       el.append(r);
     }
     if (s.phase === 'done') return;
@@ -227,13 +232,29 @@ export default {
     sc.start[s.q] ??= Date.now();
     const left = Math.max(0, QUESTION_MS - (Date.now() - sc.start[s.q]));
 
+    // Студио: екран с въпроса, кръгъл таймер и прожектори.
+    const stage = make('div', 'qz-stage');
     const card = make('div', 'qz-card');
-    card.append(make('p', 'qz-n', `Въпрос ${s.q + 1} от ${s.questions.length}${s.by === 'claude' ? ' · от Claude' : ''}`), make('p', 'qz-q', item.q));
-    const bar = make('div', 'qz-bar');
-    const fill = make('span');
-    fill.style.animationDuration = `${left}ms`;
-    bar.append(fill);
-    card.append(bar);
+    const head = make('div', 'qz-head');
+    const NS = 'http://www.w3.org/2000/svg';
+    const ring = document.createElementNS(NS, 'svg');
+    ring.setAttribute('viewBox', '0 0 40 40');
+    ring.setAttribute('class', 'qz-ring');
+    ring.innerHTML = '<circle cx="20" cy="20" r="17" class="bg"/><circle cx="20" cy="20" r="17" class="fg" pathLength="1"/>';
+    const fg = ring.querySelector('.fg');
+    fg.style.animationDuration = `${left}ms`;
+    fg.style.strokeDashoffset = String(1 - left / QUESTION_MS);
+    const secs = make('span', 'qz-secs num', String(Math.ceil(left / 1000)));
+    const timer = make('div', 'qz-timer');
+    timer.append(ring, secs);
+    sc.tick = setInterval(() => {
+      const l = Math.max(0, QUESTION_MS - (Date.now() - sc.start[s.q]));
+      secs.textContent = String(Math.ceil(l / 1000));
+      timer.classList.toggle('low', l < 5000);
+      if (!secs.isConnected || l <= 0) clearInterval(sc.tick);
+    }, 250);
+    head.append(make('p', 'qz-n', `Въпрос ${s.q + 1} от ${s.questions.length}${s.by === 'claude' ? ', от Claude' : ''}`), timer);
+    card.append(head, make('p', 'qz-q', item.q));
     const answers = make('div', 'qz-answers');
     item.a.forEach((txt, k) => {
       const b = make('button', `qz-a c${k}` + (mine?.choice === k ? ' picked' : ''));
@@ -248,8 +269,9 @@ export default {
     });
     card.append(answers);
     const n = Object.keys(answeredBy(s, s.q)).length;
-    card.append(make('p', 'hint', mine !== undefined ? `Отговори ${n} от ${s.players.length}. Чакаме останалите.` : `Отговорили: ${n} от ${s.players.length}.`));
-    el.append(card);
+    card.append(make('p', 'hint qz-hint', mine !== undefined ? `Отговори ${n} от ${s.players.length}. Чакаме останалите.` : `Отговорили: ${n} от ${s.players.length}.`));
+    stage.append(card);
+    el.append(stage);
 
     if (canAnswer) {
       sc.timer = setTimeout(() => ctx.onMove({ type: 'answer', q: s.q, choice: -1, ms: QUESTION_MS }), left + 50);
@@ -266,26 +288,62 @@ export default {
   },
 
   css: `
-.qz-card { display:grid; gap:12px; width:min(100%,480px); margin-inline:auto; padding:16px; border:2px solid var(--ink); border-radius:var(--r-lg); background:var(--surface); box-shadow:var(--shadow-pop); }
-.qz-wait { text-align:center; }
-.qz-n { font-size:var(--step--1); color:var(--ink-2); font-weight:700; }
-.qz-q { font:700 var(--step-1)/1.3 var(--f-body); text-wrap:balance; }
-.qz-bar { height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
-.qz-bar span { display:block; height:100%; background:var(--accent); transform-origin:left; animation:qzbar linear forwards; }
-@keyframes qzbar { from { transform:scaleX(1); } to { transform:scaleX(0); } }
-.qz-answers { display:grid; grid-template-columns:1fr; gap:8px; }
+/* Студио: тъмна сцена с два прожектора и отражение на пода. */
+.qz-stage { position:relative; width:min(100%,520px); margin-inline:auto; padding:22px 14px 26px; border-radius:22px; overflow:hidden; isolation:isolate;
+  background: radial-gradient(80% 50% at 50% 100%, rgb(120 90 255 / .35), transparent 70%), linear-gradient(180deg,#141a35,#1d2450 60%,#10142b);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / .08), 0 10px 26px rgb(0 0 0 / .3); }
+.qz-stage::before, .qz-stage::after { content:''; position:absolute; top:-30%; width:60%; height:140%; z-index:-1; filter:blur(6px); pointer-events:none;
+  background: linear-gradient(180deg, rgb(255 240 200 / .32), rgb(255 240 200 / 0) 75%); animation: qzSpot 6s ease-in-out infinite alternate; }
+.qz-stage::before { left:-14%; clip-path:polygon(40% 0, 60% 0, 100% 100%, 0 100%); transform-origin:50% 0; rotate:-16deg; }
+.qz-stage::after { right:-14%; clip-path:polygon(40% 0, 60% 0, 100% 100%, 0 100%); transform-origin:50% 0; rotate:16deg; animation-delay:-3s; }
+@keyframes qzSpot { from { translate:-6% 0; } to { translate:6% 0; } }
+.qz-card { position:relative; display:grid; gap:12px; padding:16px; border-radius:16px; color:#eef1ff;
+  background: linear-gradient(160deg, rgb(255 255 255 / .1), rgb(255 255 255 / .03)), #1a2148; border:2px solid rgb(160 170 255 / .35);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 0 0 4px #0c1028, 0 0 30px rgb(110 120 255 / .25); }
+.qz-wait { text-align:center; width:min(100%,480px); margin-inline:auto; color:var(--ink); background:var(--surface); border-color:var(--ink); }
+.qz-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.qz-n { font-size:var(--step--1); color:#b9c0ff; font-weight:700; letter-spacing:.02em; }
+.qz-q { font:700 var(--step-1)/1.3 var(--f-body); text-wrap:balance; text-shadow:0 1px 2px rgb(0 0 0 / .4); }
+.qz-timer { position:relative; width:46px; height:46px; flex:none; display:grid; place-items:center; }
+.qz-ring { position:absolute; inset:0; rotate:-90deg; }
+.qz-ring circle { fill:none; stroke-width:4; }
+.qz-ring .bg { stroke:rgb(255 255 255 / .15); }
+.qz-ring .fg { stroke:#7ee0a6; stroke-linecap:round; stroke-dasharray:1; animation: qzRing linear forwards; }
+@keyframes qzRing { to { stroke-dashoffset:1; } }
+.qz-timer.low .qz-ring .fg { stroke:#ff6b5a; }
+.qz-timer.low .qz-secs { color:#ffb0a6; animation: qzBeat .5s ease-in-out infinite alternate; }
+@keyframes qzBeat { to { transform:scale(1.18); } }
+.qz-secs { font:800 1rem/1 var(--f-display); color:#fff; }
+.qz-answers { display:grid; grid-template-columns:1fr; gap:10px; }
 @media (min-width:520px) { .qz-answers { grid-template-columns:1fr 1fr; } }
-.qz-a { display:flex; align-items:center; gap:10px; min-height:52px; padding:10px 12px; border-radius:var(--r-md); border:2px solid var(--ink);
-  background:var(--qa); color:#fff; font-weight:700; text-align:left; cursor:pointer; box-shadow:0 3px 0 var(--ink); }
+/* Отговорите: удължени шестоъгълници с гланц, като в телевизионно шоу. */
+.qz-a { position:relative; display:flex; align-items:center; gap:10px; min-height:54px; padding:10px 22px; border:0; color:#fff; font-weight:700; text-align:left; cursor:pointer;
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%);
+  background: linear-gradient(180deg, rgb(255 255 255 / .28), rgb(255 255 255 / 0) 48%, rgb(0 0 0 / .12)), var(--qa);
+  transition: transform .15s cubic-bezier(.2,1.4,.4,1), filter .15s; }
 .qz-a.c0 { --qa:var(--seat-1); } .qz-a.c1 { --qa:var(--seat-2); } .qz-a.c2 { --qa:#b07a14; } .qz-a.c3 { --qa:var(--seat-4); }
-.qz-a:disabled { cursor:default; opacity:.55; }
-.qz-a.picked { opacity:1; outline:4px solid var(--sun); outline-offset:2px; }
-.qz-a:not(:disabled):active { transform:translateY(3px); box-shadow:none; }
-.qz-l { display:grid; place-items:center; width:28px; height:28px; border-radius:50%; background:rgb(255 255 255 / .25); flex:none; }
-.qz-reveal { width:min(100%,480px); margin:0 auto 10px; padding:10px 14px; border-radius:var(--r-md); background:var(--surface-2); font-weight:700; }
+.qz-a:not(:disabled):hover { transform:scale(1.03); filter:brightness(1.1); }
+.qz-a:disabled { cursor:default; filter:saturate(.35) brightness(.75); }
+.qz-a.picked { filter:none; box-shadow:none; background: linear-gradient(180deg, rgb(255 255 255 / .4), rgb(255 255 255 / .05) 48%), var(--qa); animation: qzPick .5s cubic-bezier(.2,1.4,.4,1); }
+.qz-a.picked::after { content:'✓'; margin-left:auto; font-size:1.1rem; }
+@keyframes qzPick { 40% { transform:scale(1.07); } }
+.qz-a:not(:disabled):active { transform:scale(.97); }
+.qz-a:focus-visible { outline:3px solid var(--sun); outline-offset:3px; }
+.qz-l { position:relative; display:grid; place-items:center; width:28px; height:28px; flex:none; isolation:isolate; }
+.qz-l::before { content:''; position:absolute; inset:3px; rotate:45deg; border-radius:5px; z-index:-1; background:rgb(0 0 0 / .28); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .5); }
+.qz-hint { color:#b9c0ff; }
+.qz-score { gap:8px; }
+.qz-score .rv-score-item { padding:5px 12px 5px 8px; border-radius:999px; background:#141a35; color:#fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .15), 0 3px 0 #0c1028; }
+.qz-reveal { display:flex; align-items:center; gap:12px; width:min(100%,520px); margin:0 auto 12px; padding:10px 14px; border-radius:var(--r-md); background:var(--surface-2); font-weight:700; }
+.qz-reveal.right { background: color-mix(in srgb, #1d9563 20%, var(--surface)); box-shadow: inset 0 0 0 2px #1d9563; }
+.qz-reveal.wrong { background: color-mix(in srgb, var(--bad, #d93226) 14%, var(--surface)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--bad, #d93226) 70%, transparent); }
+.qz-reveal-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; flex:none; font:800 1.1rem/1 var(--f-display); color:#fff; background:var(--ink-2); }
+.qz-reveal.right .qz-reveal-mark { background:#1d9563; }
+.qz-reveal.wrong .qz-reveal-mark { background:var(--bad, #d93226); }
+.qz-reveal-who { font-weight:500; color:var(--ink-2); }
 .qz-art { display:grid; grid-template-columns:repeat(2,30px); gap:5px; }
 .qz-art span { height:30px; border-radius:7px; border:2px solid var(--ink); display:grid; place-items:center; color:#fff; font-weight:800; }
 .qz-art .c0 { background:var(--seat-1); } .qz-art .c1 { background:var(--seat-2); } .qz-art .c2 { background:#b07a14; } .qz-art .c3 { background:var(--seat-4); }
-@media (prefers-reduced-motion: reduce) { .qz-bar span { animation-timing-function:steps(4); } }
+@media (prefers-reduced-motion: reduce) { .qz-stage::before, .qz-stage::after, .qz-secs { animation:none !important; } .qz-ring .fg { animation-timing-function:steps(4); } }
 `,
 };

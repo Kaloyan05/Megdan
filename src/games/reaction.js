@@ -165,12 +165,24 @@ export default {
   },
 
   css: `
-.rx-pad { display:grid; place-items:center; width:min(100%,420px); aspect-ratio:4/3; margin-inline:auto; border-radius:var(--r-lg);
-  border:3px solid var(--ink); background:var(--accent); color:#fff; cursor:pointer; box-shadow:var(--shadow-pop); touch-action:manipulation; user-select:none; }
-.rx-pad.go { background:var(--seat-4); }
-.rx-pad.early { background:var(--ink-2); }
-.rx-pad.done { background:var(--surface-2); color:var(--ink); cursor:default; }
-.rx-label { font:800 clamp(1.4rem,7vw,2.4rem)/1.1 var(--f-display); text-align:center; padding:12px; }
+/* Светофар: тъмен корпус, голяма леща, която свети червено и после зелено. */
+.rx-pad { position:relative; display:grid; place-items:center; width:min(100%,420px); aspect-ratio:4/3; margin-inline:auto; border-radius:28px; isolation:isolate;
+  border:0; cursor:pointer; touch-action:manipulation; user-select:none; color:#fff;
+  background: var(--grain), linear-gradient(180deg,#2b3242,#161b26);
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / .12), inset 0 -4px 0 rgb(0 0 0 / .4), 0 8px 0 #0b0e15, 0 18px 30px rgb(0 0 0 / .3); }
+.rx-pad::before { content:''; position:absolute; width:62%; aspect-ratio:1; border-radius:50%; z-index:-1;
+  background: radial-gradient(circle at 38% 32%, #ffb4a8 0 6%, #ff4a36 30%, #a8180c 72%, #4a0904 100%);
+  box-shadow: 0 0 0 8px #0d1118, 0 0 0 10px #3a4252, 0 0 50px 8px rgb(255 60 40 / .45); transition: background .08s, box-shadow .08s; }
+.rx-pad::after { content:''; position:absolute; width:62%; aspect-ratio:1; border-radius:50%; z-index:-1; pointer-events:none;
+  background: radial-gradient(60% 40% at 40% 22%, rgb(255 255 255 / .45), transparent 70%), repeating-radial-gradient(circle at 50% 50%, rgb(255 255 255 / .05) 0 3px, transparent 3px 7px); }
+.rx-pad.go::before { background: radial-gradient(circle at 38% 32%, #d4ffd6 0 6%, #3ee06a 30%, #108a35 72%, #03300f 100%);
+  box-shadow: 0 0 0 8px #0d1118, 0 0 0 10px #3a4252, 0 0 70px 16px rgb(60 230 110 / .6); }
+.rx-pad.early::before { background: radial-gradient(circle at 38% 32%, #b8bfcc 0 6%, #6b7383 40%, #2a303c 100%); box-shadow: 0 0 0 8px #0d1118, 0 0 0 10px #3a4252; }
+.rx-pad.early { animation: fxShake .42s; }
+.rx-pad.done { cursor:default; }
+.rx-pad.done::before { background: radial-gradient(circle at 38% 32%, #e8ecf3 0 6%, #9aa4b5 45%, #4a5263 100%); box-shadow: 0 0 0 8px #0d1118, 0 0 0 10px #3a4252; }
+.rx-label { font:800 clamp(1.3rem,6.5vw,2.2rem)/1.1 var(--f-display); text-align:center; padding:12px; text-shadow: 0 2px 4px rgb(0 0 0 / .6); max-width:60%; }
+.rx-pad:focus-visible { outline:3px solid var(--focus); outline-offset:4px; }
 .rx-art { width:70px; height:56px; border-radius:12px; border:2px solid var(--ink); background:var(--seat-4); display:grid; place-items:center; font-size:1.8rem; }
 `,
 };

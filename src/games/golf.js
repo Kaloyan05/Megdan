@@ -263,6 +263,11 @@ export default {
       svgEl('linearGradient', { id: 'gf-water', x1: 0, y1: 0, x2: 1, y2: 1 }, [stop('0', '#5fb7e8'), stop('.6', '#2f86c6'), stop('1', '#1f6aa6')]),
       svgEl('linearGradient', { id: 'gf-steel', x1: 0, y1: 0, x2: 1, y2: 0 }, [stop('0', '#6b7685'), stop('.45', '#e8edf3'), stop('1', '#8893a2')]),
       svgEl('radialGradient', { id: 'gf-cup', cx: '50%', cy: '40%', r: '60%' }, [stop('0', '#020502'), stop('.8', '#0d1a0d'), stop('1', '#24361f')]),
+      // Текстура на тревата: фин шум върху окосените ивици.
+      svgEl('filter', { id: 'gf-noise', x: 0, y: 0, width: '100%', height: '100%' }, [
+        svgEl('feTurbulence', { type: 'fractalNoise', baseFrequency: '1.4', numOctaves: 2, seed: 3, result: 't' }),
+        svgEl('feColorMatrix', { in: 't', values: '0 0 0 0 0.05  0 0 0 0 0.25  0 0 0 0 0.02  0 0 0 0.55 -0.18' }),
+      ]),
       svgEl('filter', { id: 'gf-shadow', x: '-30%', y: '-30%', width: '160%', height: '160%' }, [
         svgEl('feDropShadow', { dx: .5, dy: 1, stdDeviation: .55, 'flood-color': '#0b2208', 'flood-opacity': .45 }),
       ]),
@@ -276,7 +281,15 @@ export default {
     svg.append(svgEl('rect', { x: -5, y: -5, width: 110, height: 160, rx: 7, fill: 'url(#gf-rail)' }));
     svg.append(svgEl('rect', { x: -2.2, y: -2.2, width: 104.4, height: 154.4, rx: 4.5, fill: 'none', stroke: 'rgb(255 220 170 / .35)', 'stroke-width': .6 }));
     svg.append(svgEl('rect', { x: 0, y: 0, width: W, height: H, rx: 3, fill: 'url(#gf-mow)' }));
+    svg.append(svgEl('rect', { x: 0, y: 0, width: W, height: H, rx: 3, fill: '#fff', filter: 'url(#gf-noise)' }));
     svg.append(svgEl('rect', { x: 0, y: 0, width: W, height: H, rx: 3, fill: 'url(#gf-light)' }));
+    // Храстчета в ъглите на борда.
+    for (const [bx, by] of [[-2.5, -2.5], [102.5, -2.5], [-2.5, 152.5], [102.5, 152.5]]) {
+      for (const [dx, dy, r, c] of [[0, 0, 3.2, '#2f7a2c'], [1.8, -1.2, 2.2, '#3f9a3a'], [-1.5, 1.2, 2, '#3a8d35'], [.6, .8, 1.2, '#57b04f']]) {
+        svg.append(svgEl('circle', { cx: bx + dx, cy: by + dy, r, fill: c }));
+      }
+      svg.append(svgEl('circle', { cx: bx + 1, cy: by - .6, r: .55, fill: '#ffd54a' }), svgEl('circle', { cx: bx - 1.2, cy: by + 1, r: .5, fill: '#ff8fb0' }));
+    }
     svg.append(svgEl('rect', { x: .4, y: .4, width: W - .8, height: H - .8, rx: 3, fill: 'none', stroke: 'rgb(10 40 5 / .35)', 'stroke-width': 1.4 }));
     // склонове: по-светло в горния край и стрелки надолу по наклона
     (course.slopes ?? []).forEach(([x0, y0, x1, y1, ax, ay], k) => {
