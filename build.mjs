@@ -25,7 +25,7 @@ const claudeHtml = page(await bundle(false));
 await writeFile('dist/index.html', claudeHtml);
 console.log(`dist/index.html: ${(claudeHtml.length / 1024).toFixed(1)} KB`);
 // Сайтът е цял документ: заглавие, иконки, преглед на линка във Viber/Messenger, инсталиране на телефона.
-const SITE_URL = 'https://kaloyan05.github.io/megdan/';
+import { SITE_URL } from './src/site-config.js';
 const head = `<!doctype html><html lang="bg"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="16 игри с приятели: стаи с код, ходове на ред и игри на живо. Без регистрация.">
