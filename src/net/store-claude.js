@@ -2,10 +2,11 @@
 
 export async function createClaudeStore() {
   if (!window.claude?.use) return null;
-  const [db, user, room] = await Promise.all([
+  const [db, user, room, sample] = await Promise.all([
     window.claude.use('db'),
     window.claude.use('user'),
     window.claude.use('room'),
+    window.claude.use('sample').catch(() => null),
   ]);
   if (!db || !user) return null;
   const me = await user.id();
@@ -33,6 +34,7 @@ export async function createClaudeStore() {
 
   return {
     kind: 'claude',
+    sample, // null, ако Claude не е достъпен от страницата
     me,
     canWrite,
     user,

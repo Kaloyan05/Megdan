@@ -39,6 +39,9 @@ export const REASONS = {
   'must-capture': 'Вземането е задължително.',
   'continue-capture': 'Продължи вземането със същата фигура.',
   'must-stack': 'Сложи +2 или +4, или тегли.',
+  answered: 'Вече отговори.',
+  'old-question': 'Този въпрос мина.',
+  'old-round': 'Този рунд мина.',
   'bad-shot': 'Ударът е твърде слаб или посоката е невалидна.',
   'wait-answer': 'Изчакай отговора за предишния изстрел.',
   'wait-place': 'Изчакай и двамата да разположат корабите.',
@@ -612,18 +615,19 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     }
     if (room.status === 'playing') storageSet('lastGame', room.gameId);
 
-    // Игри с лични данни: заредени ли са, автоматичен отговор, разкриване накрая.
-    if (result?.game.usesSecret && room.players.includes(me)) {
-      const sec = secretApi(room.round);
-      if (!sec.loaded) sec.load();
+    // Автоматични действия на играта (отговор от скрит флот, подготовка на въпроси) и разкриване накрая.
+    if (result && room.players.includes(me)) {
+      const sec = result.game.usesSecret ? secretApi(room.round) : null;
+      if (sec && !sec.loaded) sec.load();
       const key = `${room.round}:${result.nextIndex}`;
       if (!result.over && result.game.onTurn && onTurnFor !== key) {
         onTurnFor = key;
-        result.game.onTurn(result.state, { me, secret: sec }).then((move) => {
-          if (move && !destroyed) api.sendMove(code, room.round, move, result.nextIndex).catch(() => { onTurnFor = ''; });
+        const at = result.nextIndex;
+        result.game.onTurn(result.state, { me, secret: sec, sample: api.store.sample ?? null, toast, startedAt: room.startedAt }).then((move) => {
+          if (move && !destroyed) api.sendMove(code, room.round, move, at).catch(() => { onTurnFor = ''; });
         }).catch(() => { onTurnFor = ''; });
       }
-      if (result.over && revealedRound !== room.round) {
+      if (sec && result.over && revealedRound !== room.round) {
         revealedRound = room.round;
         sec.load().then((d) => {
           if (d) api.store.set(`rooms/${code}/reveal/${me}`, { round: room.round, ...d }).catch(() => { revealedRound = 0; });

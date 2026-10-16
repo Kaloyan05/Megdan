@@ -50,7 +50,8 @@ async function solo(name, tag, level) {
 const LIST = [
   ['Четири в редица', 'connect4'], ['Реверси', 'reversi'], ['Точки и кутийки', 'dots'], ['Цветна осмица', 'color8'],
   ['Ултимат морски шах', 'uttt'], ['Покер със зарове', 'dice'], ['Мемори', 'memory'], ['Не се сърди човече', 'ludo'],
-  ['Табла', 'tabla'], ['Морски бой', 'battleship'], ['Мини голф', 'golf'],
+  ['Табла', 'tabla'], ['Морски бой', 'battleship'], ['Мини голф', 'golf'], ['Дама', 'checkers'],
+  ['Викторина', 'quiz'], ['Реакция-рали', 'reaction'],
 ];
 const extra = JSON.parse(process.env.EXTRA ?? '[]');
 let ok = true;

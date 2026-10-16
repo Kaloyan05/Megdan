@@ -84,4 +84,15 @@ export const ACT = {
     await p.waitForTimeout(30);
     if (await tgt.count()) await tgt.first().click();
   },
+  'Викторина': async (p) => {
+    const a = p.locator('.qz-a:not([disabled])');
+    if (await a.count()) await a.nth(Math.floor(Math.random() * (await a.count()))).click();
+  },
+  'Реакция-рали': async (p) => {
+    const pad = p.locator('.rx-pad:not([disabled])');
+    if (!(await pad.count())) return;
+    if (Math.random() < 0.1) return pad.click(); // понякога подранява
+    await p.locator('.rx-pad.go').waitFor({ timeout: 6000 }).catch(() => {});
+    await pad.click().catch(() => {});
+  },
 };

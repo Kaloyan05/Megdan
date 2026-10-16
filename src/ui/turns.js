@@ -21,9 +21,9 @@ export function createTurnWatcher(api) {
       const r = replay(game, {
         seed: room.seed, players: room.players, log, options: room.gameOptions, startedAt: room.startedAt, turnLimitMs: (room.timerSec || 0) * 1000,
       });
-      Object.assign(s, { current: r.current, over: r.over, winner: r.winner });
+      Object.assign(s, { current: r.current, over: r.over, winner: r.winner, state: r.state });
     }
-    s.myTurn = s.current === api.me;
+    s.myTurn = s.over ? false : game?.waitingFor && s.state ? game.waitingFor(s.state).includes(api.me) : s.current === api.me;
     s.inGame = Boolean(room.players?.includes(api.me));
     return s;
   };
