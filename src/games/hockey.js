@@ -4,6 +4,7 @@
 
 import { isBot } from '../core/bots.js';
 import { liveGame, FW, FH, clamp, round3, newestBy, waitingMessage } from './live.js';
+import { createFx, shadow, ball3d } from './live-fx.js';
 
 const RM = 0.068; // стик
 const RP = 0.042; // шайба
@@ -73,10 +74,14 @@ export function hockeyModel({ players, seat, iSim, simId, controls, target, soun
   let stillSince = 0;
   const botErr = {};
   const model = { final: null, score: [0, 0] };
+  const fx = createFx();
+  let dotsCache = null;
 
   const adopt = (p, now) => {
     stillSince = now;
-    if (pk && p.n > pk.n && p.kind === 'goal') { goalAt = now; sound?.drop(); }
+    if (pk && p.n > pk.n && p.kind === 'goal') { goalAt = now; sound?.drop(); fx.flash(now); fx.resetTrail(); }
+    // Рязка смяна на посоката в полученото състояние = удар (за искрите при другия играч).
+    if (pk && p.n === pk.n && !controls(pk.own) && Math.hypot(p.vx - pk.vx, p.vy - pk.vy) > 0.6) fx.sparkle(p.x, p.y, '#fff', now, 8);
     pk = { ...p };
     lastKey = key(p);
     model.score = p.score.slice();
@@ -158,7 +163,7 @@ export function hockeyModel({ players, seat, iSim, simId, controls, target, soun
     const fr = Math.exp(-FRICTION * dt);
     pk.vx *= fr; pk.vy *= fr;
     if (Math.hypot(pk.vx, pk.vy) < 0.004) { pk.vx = 0; pk.vy = 0; }
-    if (hit) sound?.tap();
+    if (hit) { sound?.tap(); fx.sparkle(pk.x, pk.y, '#fff', now, 8); }
     // Правило за 8-те секунди: шайбата не може да стои вечно в една половина.
     if (now - stillSince > STILL_MS) {
       model.passes += 1;
@@ -227,25 +232,51 @@ export function hockeyModel({ players, seat, iSim, simId, controls, target, soun
     return null;
   };
 
-  model.draw = (g, T, c) => {
+  model.draw = (g, T, c, now) => {
     const { k } = T;
-    g.fillStyle = c.surface;
-    g.fillRect(0, 0, FW * k, FH * k);
-    // маркировка
-    g.strokeStyle = c.line;
-    g.lineWidth = Math.max(2, k * 0.008);
-    g.beginPath(); g.moveTo(0, T.y(MID)); g.lineTo(FW * k, T.y(MID)); g.stroke();
+    const w = FW * k, h = FH * k;
+    // Маса за въздушен хокей: бяла-синкава повърхност с малки дупчици за въздуха.
+    const bg = g.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#f4f8fc'); bg.addColorStop(1, '#dfe8f2');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    if (!dotsCache || dotsCache.width !== Math.round(w) || dotsCache.height !== Math.round(h)) {
+      dotsCache = document.createElement('canvas');
+      dotsCache.width = Math.round(w); dotsCache.height = Math.round(h);
+      const d = dotsCache.getContext('2d');
+      d.fillStyle = 'rgb(60 90 130 / .18)';
+      const step = k * 0.045;
+      for (let y = step / 2; y < h; y += step) for (let x = step / 2; x < w; x += step) { d.beginPath(); d.arc(x, y, k * 0.004, 0, Math.PI * 2); d.fill(); }
+    }
+    g.drawImage(dotsCache, 0, 0);
+    // маркировка: червена средна линия, кръг в центъра, полукръгове пред вратите
+    g.strokeStyle = 'rgb(210 50 40 / .75)';
+    g.lineWidth = Math.max(2, k * 0.01);
+    g.beginPath(); g.moveTo(0, T.y(MID)); g.lineTo(w, T.y(MID)); g.stroke();
+    g.strokeStyle = 'rgb(40 90 200 / .55)';
+    g.lineWidth = Math.max(1.5, k * 0.007);
     g.beginPath(); g.arc(T.x(0.5), T.y(MID), 0.14 * k, 0, Math.PI * 2); g.stroke();
-    // врати
     [0, 1].forEach((i) => {
-      g.fillStyle = c.seats[i];
       const y = i === 0 ? FH : 0;
-      const x0 = Math.min(T.x(MOUTH[0]), T.x(MOUTH[1]));
-      g.fillRect(x0, T.y(y) - k * 0.012, (MOUTH[1] - MOUTH[0]) * k, k * 0.024);
+      g.fillStyle = c.seats[i];
       g.globalAlpha = 0.12;
-      g.beginPath(); g.arc(T.x(0.5), T.y(y), 0.2 * k, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(T.x(0.5), T.y(y), 0.22 * k, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = 0.6;
+      g.strokeStyle = c.seats[i];
+      g.beginPath(); g.arc(T.x(0.5), T.y(y), 0.22 * k, 0, Math.PI * 2); g.stroke();
       g.globalAlpha = 1;
+      // вратата: тъмен процеп в борда
+      const x0 = Math.min(T.x(MOUTH[0]), T.x(MOUTH[1]));
+      g.fillStyle = '#10151f';
+      g.fillRect(x0, T.y(y) - k * 0.014, (MOUTH[1] - MOUTH[0]) * k, k * 0.028);
+      g.fillStyle = c.seats[i];
+      g.fillRect(x0 - k * 0.012, T.y(y) - k * 0.016, k * 0.012, k * 0.032);
+      g.fillRect(x0 + (MOUTH[1] - MOUTH[0]) * k, T.y(y) - k * 0.016, k * 0.012, k * 0.032);
     });
+    // борд около масата
+    g.strokeStyle = 'rgb(30 40 60 / .5)';
+    g.lineWidth = Math.max(2, k * 0.012);
+    g.strokeRect(0, 0, w, h);
     // резултат
     g.font = `800 ${Math.round(k * 0.22)}px system-ui, sans-serif`;
     g.textAlign = 'center';
@@ -256,21 +287,30 @@ export function hockeyModel({ players, seat, iSim, simId, controls, target, soun
       g.fillText(String(model.score[i]), T.x(0.5), T.y(i === 0 ? FH * 0.62 : FH * 0.38));
     });
     g.globalAlpha = 1;
-    // шайба
+    // шайба: следа, сянка, обем
     if (pk && !pk.end) {
-      g.fillStyle = c.ink;
-      g.beginPath(); g.arc(T.x(pk.x), T.y(pk.y), RP * k, 0, Math.PI * 2); g.fill();
+      fx.track(pk.x, pk.y, now);
+      fx.drawTrail(g, T, RP, '#5a6b85', now);
+      const x = T.x(pk.x), y = T.y(pk.y), r = RP * k;
+      shadow(g, x, y, r, k, 0.5);
+      ball3d(g, x, y, r, '#2a3140', '#7d8aa0', 'rgb(0 0 0 / .6)');
+      g.strokeStyle = 'rgb(255 255 255 / .25)'; g.lineWidth = Math.max(1, k * 0.004);
+      g.beginPath(); g.arc(x, y, r * 0.62, 0, Math.PI * 2); g.stroke();
     }
-    // стикове
+    // стикове: основа, пръстен и дръжка отгоре
     [0, 1].forEach((i) => {
       const x = T.x(mal[i].x);
       const y = T.y(mal[i].y);
-      g.fillStyle = c.seats[i];
-      g.strokeStyle = c.ink;
-      g.lineWidth = Math.max(1.5, k * 0.006);
-      g.beginPath(); g.arc(x, y, RM * k, 0, Math.PI * 2); g.fill(); g.stroke();
-      g.beginPath(); g.arc(x, y, RM * k * 0.45, 0, Math.PI * 2); g.stroke();
+      const r = RM * k;
+      shadow(g, x, y, r, k, 0.8);
+      ball3d(g, x, y, r, c.seats[i], '#ffffff', 'rgb(0 0 0 / .5)');
+      g.strokeStyle = 'rgb(0 0 0 / .25)'; g.lineWidth = Math.max(1, k * 0.005);
+      g.beginPath(); g.arc(x, y, r * 0.72, 0, Math.PI * 2); g.stroke();
+      shadow(g, x, y, r * 0.42, k, 0.6);
+      ball3d(g, x, y - r * 0.05, r * 0.42, c.seats[i], '#ffffff', 'rgb(0 0 0 / .45)');
     });
+    fx.drawSparks(g, T, now);
+    fx.drawFlash(g, w, h, now);
   };
 
   return model;

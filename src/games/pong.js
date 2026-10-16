@@ -4,6 +4,7 @@
 
 import { isBot } from '../core/bots.js';
 import { liveGame, FW, FH, clamp, round3, newestBy, waitingMessage, LIVE_CSS } from './live.js';
+import { createFx, shadow, ball3d } from './live-fx.js';
 
 const R = 0.022; // радиус на топката
 const PW = 0.11; // половин ширина на бухалката
@@ -43,6 +44,7 @@ export function pongModel({ players, seat, iSim, simId, controls, target, sound,
   let resolvedFor = 0;
   const botAim = {};
   const model = { final: null, score: [0, 0] };
+  const fx = createFx();
 
   const adopt = (e, at) => {
     ev = e; t0 = at; missAt = 0;
@@ -59,7 +61,7 @@ export function pongModel({ players, seat, iSim, simId, controls, target, sound,
     // 1. Най-новото събитие от всички.
     const best = newestBy(peers, 'ev', (e) => e.n);
     if (best && (!ev || best.n > ev.n)) {
-      if (best.kind === 'hit') sound?.tap(); else if (ev) sound?.drop();
+      if (best.kind === 'hit') { sound?.tap(); fx.sparkle(best.x, best.y, '#fff', now); } else if (ev) { sound?.drop(); fx.flash(now); fx.resetTrail(); }
       adopt(best, now);
     }
     // 2. Първият сервис: първият човек, щом всички са тук.
@@ -93,6 +95,7 @@ export function pongModel({ players, seat, iSim, simId, controls, target, sound,
         score: ev.score.slice(), wait: 0, end: false,
       };
       sound?.tap();
+      fx.sparkle(next.x, next.y, '#fff', now);
       adopt(next, now - (el - tl) * 1000);
       return;
     }
@@ -102,6 +105,7 @@ export function pongModel({ players, seat, iSim, simId, controls, target, sound,
     const score = ev.score.slice();
     score[1 - side] += 1;
     sound?.drop();
+    fx.flash(now); fx.resetTrail();
     adopt(serveEvent(ev.n + 1, side, score, score[1 - side] >= target), now);
   };
 
@@ -142,44 +146,64 @@ export function pongModel({ players, seat, iSim, simId, controls, target, sound,
 
   model.draw = (g, T, c, now) => {
     const { k } = T;
-    // поле
-    g.fillStyle = c.surface;
-    g.fillRect(0, 0, FW * k, FH * k);
-    g.strokeStyle = c.line;
-    g.lineWidth = Math.max(2, k * 0.008);
-    g.setLineDash([k * 0.03, k * 0.03]);
-    g.beginPath(); g.moveTo(0, T.y(FH / 2)); g.lineTo(FW * k, T.y(FH / 2)); g.stroke();
-    g.setLineDash([]);
+    const w = FW * k, h = FH * k;
+    // Маса за тенис: синьо покритие с бели ръбове и мрежа по средата.
+    const bg = g.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#2c5f9e'); bg.addColorStop(0.5, '#214f88'); bg.addColorStop(1, '#1a4072');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    const glow = g.createRadialGradient(w * 0.3, h * 0.2, 0, w * 0.3, h * 0.2, h * 0.9);
+    glow.addColorStop(0, 'rgb(255 255 255 / .14)'); glow.addColorStop(1, 'rgb(255 255 255 / 0)');
+    g.fillStyle = glow; g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgb(255 255 255 / .9)';
+    g.lineWidth = Math.max(2, k * 0.012);
+    g.strokeRect(k * 0.02, k * 0.02, w - k * 0.04, h - k * 0.04);
+    g.lineWidth = Math.max(1, k * 0.005);
+    g.beginPath(); g.moveTo(w / 2, k * 0.02); g.lineTo(w / 2, h - k * 0.02); g.stroke();
+    // мрежа
+    const ny = T.y(FH / 2);
+    g.fillStyle = 'rgb(0 0 0 / .25)'; g.fillRect(0, ny - k * 0.004, w, k * 0.03);
+    g.fillStyle = '#e9edf2'; g.fillRect(0, ny - k * 0.012, w, k * 0.016);
+    g.fillStyle = 'rgb(20 30 50 / .55)';
+    for (let x = 0; x < w; x += k * 0.02) g.fillRect(x, ny - k * 0.004, k * 0.004, k * 0.012);
     // резултат
     g.font = `800 ${Math.round(k * 0.22)}px system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.globalAlpha = 0.16;
-    [0, 1].forEach((i) => {
-      g.fillStyle = c.seats[i];
-      g.fillText(String(model.score[i]), T.x(0.5), T.y(i === 0 ? FH * 0.72 : FH * 0.28));
-    });
+    g.globalAlpha = 0.2;
+    g.fillStyle = '#fff';
+    [0, 1].forEach((i) => g.fillText(String(model.score[i]), T.x(0.5), T.y(i === 0 ? FH * 0.72 : FH * 0.28)));
     g.globalAlpha = 1;
-    // бухалки
+    // бухалки: гума в цвета на играча, сянка, отблясък
     [0, 1].forEach((i) => {
-      const y = i === 0 ? FH - PY : PY;
+      const y = T.y(i === 0 ? FH - PY : PY);
       const x0 = Math.min(T.x(pad[i] - PW), T.x(pad[i] + PW));
-      g.fillStyle = c.seats[i];
-      g.strokeStyle = c.ink;
-      g.lineWidth = Math.max(1.5, k * 0.005);
-      roundRect(g, x0, T.y(y) - (PT / 2) * k, PW * 2 * k, PT * k, PT * k * 0.5);
-      g.fill(); g.stroke();
+      const pw = PW * 2 * k, ph = PT * k;
+      g.fillStyle = 'rgb(0 0 0 / .3)';
+      roundRect(g, x0 + k * 0.006, y - ph / 2 + k * 0.012, pw, ph, ph / 2); g.fill();
+      const pg = g.createLinearGradient(0, y - ph / 2, 0, y + ph / 2);
+      pg.addColorStop(0, '#fff'); pg.addColorStop(0.25, c.seats[i]); pg.addColorStop(1, c.seats[i]);
+      g.fillStyle = pg;
+      roundRect(g, x0, y - ph / 2, pw, ph, ph / 2); g.fill();
+      // Бял кант, за да личи и синята бухалка върху синята маса.
+      g.strokeStyle = 'rgb(255 255 255 / .9)'; g.lineWidth = Math.max(2, k * 0.01); g.stroke();
+      g.strokeStyle = 'rgb(0 0 0 / .45)'; g.lineWidth = Math.max(1, k * 0.004); g.stroke();
     });
-    // топка
+    // топка: следа, сянка, обем
     let b = { x: 0.5, y: FH / 2 };
     if (ev && !ev.end) {
       b = ballPos(ev, elapsed(now));
       const side = sideOf(ev);
       // Към чужда страна: топката чака на линията, докато дойде отговорът.
       if (!controls(side)) b.y = side === 0 ? Math.min(b.y, LINE[0]) : Math.max(b.y, LINE[1]);
+      if (now - t0 > ev.wait) fx.track(b.x, b.y, now);
     }
-    g.fillStyle = c.ink;
-    g.beginPath(); g.arc(T.x(b.x), T.y(b.y), R * k, 0, Math.PI * 2); g.fill();
+    fx.drawTrail(g, T, R, '#ffd27a', now);
+    const bx = T.x(b.x), by = T.y(b.y), br = R * k;
+    shadow(g, bx, by, br, k);
+    ball3d(g, bx, by, br, '#ffb347', '#fffaf0', 'rgb(120 50 0 / .55)');
+    fx.drawSparks(g, T, now);
+    fx.drawFlash(g, w, h, now);
   };
 
   return model;
