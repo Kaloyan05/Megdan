@@ -1,6 +1,6 @@
 // Настройки на собствения сайт. firebaseConfig не е таен: стои в страницата на всеки сайт с Firebase;
 // достъпът се пази от правилата във Firebase (виж SPEC.md).
-export const SITE_URL = 'https://kaloyan05.github.io/megdan/';
+export const SITE_URL = 'https://kaloyan05.github.io/Megdan/';
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyDwCpP9sZT1uo-ygtcncnGZ5nSYfdHt4qE',
   authDomain: 'megdan-f5985.firebaseapp.com',
