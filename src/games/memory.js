@@ -111,22 +111,45 @@ export default {
     grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', 'Карти');
     grid.style.setProperty('--mm-cols', s.deck.length > 36 ? 8 : 6);
+    // Обръщане: картите, които току-що са се обърнали (или са се върнали), се анимират от предишното си положение.
+    const sc = ctx.scratch ?? {};
+    const prevUp = sc.mmUp ?? null;
+    const nowUp = new Set();
+    const toggles = [];
+    const fresh = Boolean(ctx.last?.fresh);
     for (let i = 0; i < s.deck.length; i++) {
       const owned = s.owner[i];
       const shown = owned !== null || s.open.includes(i) || s.peek.includes(i);
+      if (shown) nowUp.add(i);
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'mm-card' + (shown ? ' up' : '') + (owned !== null ? ' owned' : '') + (s.peek.includes(i) ? ' peek' : '');
+      const wasUp = prevUp ? prevUp.has(i) : shown;
+      const animate = fresh && prevUp && wasUp !== shown;
+      b.className = 'mm-card' + ((animate ? wasUp : shown) ? ' up' : '') + (owned !== null ? ' owned' : '') + (s.peek.includes(i) ? ' peek' : '');
+      if (fresh && owned !== null && s.lastPair === owned && prevUp && !(sc.mmOwned ?? []).includes(i)) b.classList.add('match');
       if (owned !== null) b.style.setProperty('--own', `var(--seat-${owned + 1})`);
+      b.style.setProperty('--tilt', `${((i * 53) % 7) - 3}deg`);
       b.disabled = !myTurn || shown;
       b.setAttribute('aria-label', shown ? `Карта ${i + 1}: ${SYMBOLS[s.deck[i]]}` : `Карта ${i + 1}, обърната`);
-      const face = document.createElement('span');
-      face.className = 'mm-face';
-      face.textContent = shown ? SYMBOLS[s.deck[i]] : '';
-      b.append(face);
+      const inner = document.createElement('span');
+      inner.className = 'mm-inner';
+      const back = document.createElement('span');
+      back.className = 'mm-back';
+      const front = document.createElement('span');
+      front.className = 'mm-front';
+      front.textContent = shown || animate ? SYMBOLS[s.deck[i]] : '';
+      inner.append(back, front);
+      b.append(inner);
+      if (animate) toggles.push([b, shown, wasUp && !shown ? 650 : 0]);
       b.addEventListener('click', () => ctx.onMove({ card: i }));
       grid.append(b);
     }
+    sc.mmUp = nowUp;
+    sc.mmOwned = s.owner.map((o, i) => (o !== null ? i : -1)).filter((i) => i >= 0);
+    // Две рамки по-късно, за да тръгне преходът от старото положение.
+    if (toggles.length) requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (const [b, up, delay] of toggles) setTimeout(() => b.classList.toggle('up', up), delay);
+    }));
     el.append(score, grid);
   },
 
@@ -143,20 +166,34 @@ export default {
   },
 
   css: `
-.mm { display:grid; grid-template-columns:repeat(var(--mm-cols, 6),minmax(0,1fr)); gap:6px; width:min(100%,440px); margin-inline:auto; }
-.mm-card { aspect-ratio:3/4; border-radius:10px; border:2px solid var(--ink); padding:0; cursor:pointer;
-  background:repeating-linear-gradient(45deg, var(--accent) 0 5px, color-mix(in srgb, var(--accent) 75%, #fff) 5px 8px);
-  box-shadow:0 3px 0 var(--ink); display:grid; place-items:center; transition:transform .15s ease; }
-.mm-card:not(:disabled):hover { transform:translateY(-2px); }
+.mm { display:grid; grid-template-columns:repeat(var(--mm-cols, 6),minmax(0,1fr)); gap:7px; width:min(100%,440px); margin-inline:auto; padding:10px; border-radius:18px;
+  background: radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--felt) 88%, #fff), var(--felt) 60%, color-mix(in srgb, var(--felt) 72%, #000));
+  box-shadow: inset 0 0 0 6px #6b3d1b, inset 0 0 0 8px #3a200c, inset 0 6px 16px rgb(0 0 0 / .3), 0 6px 0 #3a200c; }
+.mm-card { aspect-ratio:3/4; border:0; padding:0; background:none; cursor:pointer; perspective:600px; transform:rotate(var(--tilt)); transition: transform .2s; }
+.mm-card:not(:disabled):hover { transform:rotate(var(--tilt)) translateY(-3px); }
 .mm-card:disabled { cursor:default; }
-.mm-card.up { background:var(--surface); animation:mmflip .25s ease-out; }
-.mm-card.owned { background:color-mix(in srgb, var(--own) 22%, var(--surface)); border-color:var(--own); box-shadow:none; animation:none; }
-.mm-card.peek { box-shadow:0 0 0 3px var(--sun); }
-.mm-face { font-size:clamp(1.2rem,6vw,1.9rem); line-height:1; }
-@keyframes mmflip { from { transform:rotateY(90deg); } }
+.mm-card:focus-visible { outline:3px solid var(--sun); outline-offset:2px; border-radius:9px; }
+.mm-inner { position:relative; display:block; width:100%; height:100%; transform-style:preserve-3d; transition: transform .45s cubic-bezier(.3,1.3,.5,1); }
+.mm-card.up .mm-inner { transform: rotateY(180deg); }
+.mm-back, .mm-front { position:absolute; inset:0; border-radius:9px; backface-visibility:hidden; -webkit-backface-visibility:hidden; display:grid; place-items:center; }
+/* Гръб: карирана шарка и ромб в средата, като колода карти. */
+.mm-back { border:2px solid #fff;
+  background:
+    radial-gradient(circle at 50% 50%, #fff 0 9%, transparent 10%),
+    conic-gradient(from 45deg at 50% 50%, transparent 0 25%, rgb(255 255 255 / .18) 0 50%, transparent 0 75%, rgb(255 255 255 / .18) 0) 0 0/10px 10px,
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 85%, #fff), var(--accent) 50%, color-mix(in srgb, var(--accent) 70%, #000));
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .25), 0 3px 0 rgb(0 0 0 / .3), 0 5px 8px rgb(0 0 0 / .25); }
+.mm-front { transform: rotateY(180deg); background:linear-gradient(160deg,#fff,#f3efe6); border:2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .2), 0 3px 0 rgb(0 0 0 / .25), 0 5px 8px rgb(0 0 0 / .2);
+  font-size:clamp(1.2rem,6vw,1.9rem); line-height:1; }
+.mm-card.peek .mm-front { box-shadow: 0 0 0 3px var(--sun), 0 3px 0 rgb(0 0 0 / .25); }
+.mm-card.owned { transform: rotate(var(--tilt)) scale(.94); }
+.mm-card.owned .mm-front { background:linear-gradient(160deg, color-mix(in srgb, var(--own) 22%, #fff), color-mix(in srgb, var(--own) 34%, #fff)); box-shadow: 0 0 0 2px var(--own), 0 2px 0 rgb(0 0 0 / .2); }
+.mm-card.match { animation: mmMatch .7s cubic-bezier(.2,1.4,.4,1) .35s backwards; }
+@keyframes mmMatch { 0% { transform:rotate(var(--tilt)) scale(1); } 40% { transform:rotate(0) scale(1.18); filter:brightness(1.15); } 100% { transform:rotate(var(--tilt)) scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .mm-inner { transition:none; } .mm-card.match { animation:none; } }
 .mm-art { display:grid; grid-template-columns:repeat(2,34px); gap:6px; }
 .mm-art span { height:44px; border-radius:7px; border:2px solid var(--ink); background:var(--surface); display:grid; place-items:center; font-size:1.3rem; }
 .mm-art span.back { background:repeating-linear-gradient(45deg, var(--accent) 0 4px, color-mix(in srgb, var(--accent) 75%, #fff) 4px 7px); }
-@media (prefers-reduced-motion: reduce) { .mm-card.up { animation:none; } }
 `,
 };

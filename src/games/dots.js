@@ -123,10 +123,14 @@ export default {
     grid.style.gridTemplateRows = `repeat(${s.R}, var(--dot) 1fr) var(--dot)`;
     grid.setAttribute('aria-label', 'Дъска с точки');
 
+    const fresh = Boolean(ctx.last?.fresh);
+    const sc = ctx.scratch ?? {};
+    const prevBoxes = sc.dbBoxes ?? s.boxes;
+    sc.dbBoxes = s.boxes.slice();
     const lineBtn = (line, dir, label) => {
       const owner = s.lines[line];
       const b = document.createElement('button');
-      b.className = `db-line ${dir}` + (owner !== null ? ' drawn' : '') + (line === s.last ? ' last' : '');
+      b.className = `db-line ${dir}` + (owner !== null ? ' drawn' : '') + (line === s.last ? ' last' : '') + (fresh && line === s.last ? ' fresh' : '');
       if (owner !== null) b.style.setProperty('--stroke', `var(--seat-${owner + 1})`);
       b.disabled = owner !== null || !myTurn;
       b.setAttribute('aria-label', label + (owner !== null ? `, тегли ${ctx.nickOf(s.players[owner])}` : ''));
@@ -146,10 +150,15 @@ export default {
         } else {
           const owner = s.boxes[r * s.C + c];
           const box = document.createElement('span');
-          box.className = 'db-box' + (owner !== null ? ' owned' : '');
+          const isNew = fresh && owner !== null && prevBoxes[r * s.C + c] === null;
+          box.className = 'db-box' + (owner !== null ? ' owned' : '') + (isNew ? ' new' : '');
           if (owner !== null) {
             box.style.setProperty('--box', `var(--seat-${owner + 1})`);
-            box.textContent = ctx.nickOf(s.players[owner]).slice(0, 1).toUpperCase();
+            box.style.setProperty('--rot', `${(((r * 7 + c * 13) % 11) - 5) * 2}deg`);
+            const stamp = document.createElement('span');
+            stamp.className = 'db-stamp';
+            stamp.textContent = ctx.nickOf(s.players[owner]).slice(0, 1).toUpperCase();
+            box.append(stamp);
           }
           grid.append(box);
         }
@@ -166,27 +175,41 @@ export default {
   },
 
   css: `
-.db { --dot: 12px; display:grid; width:min(100%,420px); aspect-ratio:1; margin-inline:auto; padding:10px;
-  background:var(--surface); border:2px solid var(--line); border-radius:var(--r-lg); }
-.db-dot { background:var(--ink); border-radius:50%; position:relative; z-index:2; }
+/* Лист от тетрадка на квадратчета; линиите са като от химикал. */
+.db { --dot: 12px; display:grid; width:min(100%,420px); aspect-ratio:1; margin-inline:auto; padding:12px; border-radius:6px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 13px, rgb(70 120 210 / .16) 13px 14px),
+    repeating-linear-gradient(90deg, transparent 0 13px, rgb(70 120 210 / .16) 13px 14px),
+    linear-gradient(170deg,#fffdf6,#f6f1e2);
+  box-shadow: 0 1px 0 #e7e0cc, 0 3px 0 #ddd5bd, 0 5px 0 #d2c9ae, 0 10px 18px rgb(60 45 10 / .22); transform: rotate(-.6deg); }
+.db-dot { border-radius:50%; position:relative; z-index:2; background:radial-gradient(circle at 35% 30%, #4a5366, #1b2333 70%); box-shadow:0 1px 1px rgb(0 0 0 / .3); }
 .db-line { border:0; padding:0; background:transparent; position:relative; cursor:pointer; border-radius:6px; }
-.db-line::before { content:""; position:absolute; border-radius:6px; background:var(--line); opacity:.55; }
-.db-line.hz::before { left:0; right:0; top:50%; height:6px; transform:translateY(-50%); }
-.db-line.vt::before { top:0; bottom:0; left:50%; width:6px; transform:translateX(-50%); }
+.db-line::before { content:""; position:absolute; border-radius:6px; background:rgb(27 35 51 / .14); }
+.db-line.hz::before { left:-2px; right:-2px; top:50%; height:5px; transform:translateY(-50%); }
+.db-line.vt::before { top:-2px; bottom:-2px; left:50%; width:5px; transform:translateX(-50%); }
 .db-line::after { content:""; position:absolute; inset:-12px; }
 .db-line.hz::after { left:4px; right:4px; }
 .db-line.vt::after { top:4px; bottom:4px; }
-.db-line:not(:disabled):hover::before, .db-line:focus-visible::before { background:var(--ink-2); opacity:1; }
+.db-line:not(:disabled):hover::before, .db-line:focus-visible::before { background:rgb(27 35 51 / .45); }
 .db-line:disabled { cursor:default; }
-.db-line.drawn::before { background:var(--stroke); opacity:1; }
-.db-line.last::before { box-shadow:0 0 0 3px var(--sun); }
-.db-box { display:grid; place-items:center; font:800 clamp(.8rem,4vw,1.2rem)/1 var(--f-display); color:var(--ink); border-radius:4px; margin:3px; }
-.db-box.owned { background:color-mix(in srgb, var(--box) 35%, var(--surface)); animation:dbpop .25s ease-out; }
-@keyframes dbpop { from { transform:scale(.6); } }
+.db-line.drawn::before { background:linear-gradient(var(--stroke), color-mix(in srgb, var(--stroke) 75%, #000)); box-shadow:0 1px 1px rgb(0 0 0 / .2); }
+.db-line.last::before { outline:3px solid color-mix(in srgb, var(--sun) 70%, transparent); outline-offset:1px; }
+/* Новата линия се изписва от единия край до другия. */
+.db-line.hz.fresh::before { transform-origin:left center; animation: dbDrawH .35s ease-out; }
+.db-line.vt.fresh::before { transform-origin:center top; animation: dbDrawV .35s ease-out; }
+@keyframes dbDrawH { from { transform:translateY(-50%) scaleX(0); } to { transform:translateY(-50%) scaleX(1); } }
+@keyframes dbDrawV { from { transform:translateX(-50%) scaleY(0); } to { transform:translateX(-50%) scaleY(1); } }
+.db-box { display:grid; place-items:center; border-radius:3px; margin:4px; }
+.db-box.owned { background:color-mix(in srgb, var(--box) 20%, transparent); }
+/* Печат с буквата на играча. */
+.db-stamp { display:grid; place-items:center; width:72%; aspect-ratio:1; border-radius:50%; border:2.5px solid var(--box); color:var(--box);
+  font:800 clamp(.75rem,3.8vw,1.15rem)/1 var(--f-display); transform:rotate(var(--rot)); opacity:.9; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--box) 20%, transparent); }
+.db-box.new .db-stamp { animation: dbStamp .45s cubic-bezier(.2,1.5,.4,1) .3s backwards; }
+@keyframes dbStamp { from { transform:rotate(calc(var(--rot) - 25deg)) scale(1.9); opacity:0; } }
 .db-art { display:grid; grid-template-columns:repeat(2,34px); gap:6px; padding:8px; border:3px dotted var(--ink); border-radius:8px; }
 .db-art span { height:34px; border:3px solid var(--ink); border-radius:3px; }
 .db-art .o1 { background:var(--seat-1); }
 .db-art .o2 { background:var(--seat-2); }
-@media (prefers-reduced-motion: reduce) { .db-box.owned { animation:none; } }
+@media (prefers-reduced-motion: reduce) { .db-line.fresh::before, .db-box.new .db-stamp { animation:none; } }
 `,
 };

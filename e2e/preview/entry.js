@@ -2,10 +2,18 @@
 // ?game=golf&opts={"_v":2}&patch=<js тяло, което получава s и връща s>
 import { GAMES, injectGameCss } from '../../src/games/index.js';
 import { sound } from '../../src/ui/sound.js';
+import { createRng } from '../../src/core/rng.js';
 
 const q = new URLSearchParams(location.search);
 const game = GAMES.find((g) => g.id === q.get('game'));
 let s = game.init('seed', JSON.parse(q.get('players') ?? '["me","bot-1"]'), JSON.parse(q.get('opts') ?? '{}'));
+// moves=N: изиграва N автоматични хода, за да има реалистично състояние.
+for (let k = 0; k < Number(q.get('moves') ?? 0) && !game.isOver(s); k++) {
+  const p = (game.waitingFor?.(s) ?? [game.currentPlayer(s)])[0];
+  const m = game.autoMove(s, p, createRng(`pv:${k}`));
+  if (!m || !game.validateMove(s, m, p).ok) break;
+  s = game.applyMove(s, m, p);
+}
 const patch = q.get('patch');
 if (patch) s = new Function('s', patch)(s) ?? s;
 injectGameCss();

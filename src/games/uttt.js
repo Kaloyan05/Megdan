@@ -110,7 +110,29 @@ export default {
   render(el, s, ctx) {
     const myTurn = !ctx.over && ctx.me === s.players[s.turn];
     const open = new Set(myTurn ? playableBoards(s) : []);
-    const mark = (v) => (v === 0 ? '✕' : '◯');
+    const name = (v) => (v === 0 ? '✕' : '◯');
+    const fresh = Boolean(ctx.last?.fresh);
+    const sc = ctx.scratch ?? {};
+    const prevSmall = sc.utSmall ?? s.small;
+    sc.utSmall = s.small.slice();
+    // Знак като щрих с тебешир: SVG, който може да се „изпише“.
+    const NS = 'http://www.w3.org/2000/svg';
+    const markSvg = (v, draw, cls = 'ut-mark') => {
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 20 20');
+      svg.setAttribute('class', `${cls}${draw ? ' draw' : ''}`);
+      svg.setAttribute('aria-hidden', 'true');
+      svg.style.setProperty('--m', `var(--seat-${v + 1})`);
+      const add = (d, delay = 0) => {
+        const p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('pathLength', '1');
+        if (delay) p.style.animationDelay = `${delay}ms`;
+        svg.append(p);
+      };
+      if (v === 0) { add('M4.5 4.5 L15.5 15.5'); add('M15.5 4.5 L4.5 15.5', 160); } else add('M10 3.6 a6.4 6.4 0 1 1 -0.01 0');
+      return svg;
+    };
     el.innerHTML = '';
     const big = document.createElement('div');
     big.className = 'ut';
@@ -125,18 +147,24 @@ export default {
         const btn = document.createElement('button');
         btn.className = 'ut-cell' + (i === s.last ? ' last' : '');
         const v = s.cells[i];
-        if (v !== null) { btn.textContent = mark(v); btn.style.color = `var(--seat-${v + 1})`; }
+        if (v !== null) btn.append(markSvg(v, fresh && i === s.last));
         btn.disabled = !open.has(b) || v !== null || decided !== null;
-        btn.setAttribute('aria-label', `Дъска ${b + 1}, поле ${c + 1}${v !== null ? `, ${mark(v)}` : ''}`);
+        btn.setAttribute('aria-label', `Дъска ${b + 1}, поле ${c + 1}${v !== null ? `, ${name(v)}` : ''}`);
         btn.addEventListener('click', () => ctx.onMove({ cell: i }));
         sb.append(btn);
       }
       if (decided !== null) {
-        const o = document.createElement('span');
-        o.className = 'ut-over';
-        o.textContent = decided === 'draw' ? '=' : mark(decided);
-        if (decided !== 'draw') o.style.color = `var(--seat-${decided + 1})`;
-        sb.append(o);
+        const won = fresh && prevSmall[b] === null;
+        if (decided === 'draw') {
+          const o = document.createElement('span');
+          o.className = 'ut-over draw-txt';
+          o.textContent = '=';
+          sb.append(o);
+        } else {
+          const o = markSvg(decided, won, 'ut-over');
+          if (won) o.querySelectorAll('path').forEach((p) => { p.style.animationDelay = `${parseInt(p.style.animationDelay || '0', 10) + 380}ms`; });
+          sb.append(o);
+        }
       }
       big.append(sb);
     }
@@ -158,16 +186,32 @@ export default {
   },
 
   css: `
-.ut { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; width:min(100%,440px); margin-inline:auto; padding:6px;
-  background:var(--ink); border-radius:var(--r-lg); box-shadow:var(--shadow-pop); }
-.ut-small { position:relative; min-width:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:2px; padding:3px; border-radius:10px; background:var(--surface-2); }
-.ut-small.open { background:var(--sun); }
-.ut-small.done .ut-cell { opacity:.35; }
-.ut-cell { min-width:0; aspect-ratio:1; border:0; padding:0; border-radius:6px; background:var(--surface); font:800 clamp(.9rem,4.4vw,1.4rem)/1 var(--f-display); cursor:pointer; display:grid; place-items:center; }
+/* Черна дъска с тебешир: дървена рамка, бели линии, цветни щрихи. */
+.ut { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; width:min(100%,440px); margin-inline:auto; padding:12px; border-radius:14px;
+  background: radial-gradient(120% 100% at 30% 20%, #3c5a4c, #2a4136 60%, #213429);
+  box-shadow: inset 0 0 0 7px #8a5a2c, inset 0 0 0 9px #5a3214, inset 0 0 30px rgb(0 0 0 / .45), 0 7px 0 #3a200c, 0 14px 22px rgb(0 0 0 / .25); }
+.ut-small { position:relative; min-width:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; padding:6px; transition: background-color .3s; }
+.ut-small:nth-child(3n+1), .ut-small:nth-child(3n+2) { border-right: 3px solid rgb(240 240 230 / .75); }
+.ut-small:nth-child(-n+6) { border-bottom: 3px solid rgb(240 240 230 / .75); }
+.ut-small.open { background: rgb(255 199 67 / .2); box-shadow: inset 0 0 0 2px rgb(255 199 67 / .85); animation: utOpen 1.6s ease-in-out infinite alternate; }
+@keyframes utOpen { to { background: rgb(255 199 67 / .3); } }
+.ut-small.done .ut-cell { opacity:.28; }
+.ut-cell { min-width:0; aspect-ratio:1; border:0; padding:8%; background:none; cursor:pointer; display:grid; place-items:center; }
+.ut-cell:nth-child(3n+1), .ut-cell:nth-child(3n+2) { border-right:1.5px solid rgb(240 240 230 / .38); }
+.ut-cell:nth-child(-n+6) { border-bottom:1.5px solid rgb(240 240 230 / .38); }
 .ut-cell:disabled { cursor:default; }
-.ut-cell.last { box-shadow:inset 0 0 0 2px var(--ink); }
+.ut-small.open .ut-cell:not(:disabled):hover { background: rgb(255 255 255 / .12); }
+.ut-cell.last { background: rgb(255 255 255 / .1); border-radius:4px; }
 .ut-cell:focus-visible { outline:3px solid var(--focus); outline-offset:-2px; }
-.ut-over { position:absolute; inset:0; display:grid; place-items:center; font:800 clamp(2.4rem,14vw,4.4rem)/1 var(--f-display); pointer-events:none; color:var(--ink-2); }
+.ut-mark { width:100%; height:100%; overflow:visible; }
+.ut-mark path, .ut-over path { fill:none; stroke:color-mix(in srgb, var(--m) 70%, #fff); stroke-width:2.6; stroke-linecap:round; filter: drop-shadow(0 0 1px rgb(255 255 255 / .35)); }
+.ut-mark.draw path, .ut-over.draw path { stroke-dasharray:1; stroke-dashoffset:1; animation: utDraw .28s ease-out forwards; }
+@keyframes utDraw { to { stroke-dashoffset:0; } }
+.ut-over { position:absolute; inset:8%; width:84%; height:84%; pointer-events:none; overflow:visible; }
+.ut-over path { stroke-width:2.2; }
+.ut-over.draw path { animation-duration:.5s; }
+.ut-over.draw-txt { display:grid; place-items:center; font:800 clamp(2.4rem,14vw,4.4rem)/1 var(--f-display); color:rgb(240 240 230 / .8); width:auto; height:auto; inset:0; }
+@media (prefers-reduced-motion: reduce) { .ut-small.open { animation:none; } .ut-mark.draw path, .ut-over.draw path { animation:none; stroke-dashoffset:0; } }
 .ut-art { display:grid; grid-template-columns:repeat(3,24px); gap:3px; padding:5px; background:var(--ink); border-radius:10px; }
 .ut-art span { height:24px; background:var(--surface); border-radius:4px; display:grid; place-items:center; font:800 .9rem/1 var(--f-display); }
 .ut-art span.hot { background:var(--sun); }
