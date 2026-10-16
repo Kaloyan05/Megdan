@@ -245,7 +245,7 @@ export default {
 
   css: `
 .dp-tray { display:grid; justify-items:center; gap:12px; width:100%; padding:18px 12px; border-radius:20px;
-  background: radial-gradient(120% 90% at 50% 40%, color-mix(in srgb, var(--felt) 88%, #fff), var(--felt) 60%, color-mix(in srgb, var(--felt) 70%, #000));
+  background: var(--felt-tex), radial-gradient(120% 90% at 50% 40%, color-mix(in srgb, var(--felt) 88%, #fff), var(--felt) 60%, color-mix(in srgb, var(--felt) 70%, #000));
   box-shadow: inset 0 0 0 7px #6b3d1b, inset 0 0 0 9px #3a200c, inset 0 6px 18px rgb(0 0 0 / .35), 0 6px 0 #3a200c; }
 .dp-tray .hint { color:#fff; opacity:.92; text-align:center; text-shadow:0 1px 2px rgb(0 0 0 / .4); }
 .dp-dice { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
@@ -272,6 +272,11 @@ export default {
 .dp-face.f5 i:nth-child(1) { grid-area:1/1; } .dp-face.f5 i:nth-child(2) { grid-area:1/3; } .dp-face.f5 i:nth-child(3) { grid-area:2/2; } .dp-face.f5 i:nth-child(4) { grid-area:3/1; } .dp-face.f5 i:nth-child(5) { grid-area:3/3; }
 .dp-face.f6 i:nth-child(1) { grid-area:1/1; } .dp-face.f6 i:nth-child(2) { grid-area:2/1; } .dp-face.f6 i:nth-child(3) { grid-area:3/1; } .dp-face.f6 i:nth-child(4) { grid-area:1/3; } .dp-face.f6 i:nth-child(5) { grid-area:2/3; } .dp-face.f6 i:nth-child(6) { grid-area:3/3; }
 .board-wrap .table-wrap { width:100%; }
+/* Резултатите като в тефтер: линии, червено поле вляво, леко завъртян лист. */
+.board-wrap .table-wrap:has(.dp-sheet) { padding:14px 12px 10px 30px; margin-top:6px; border-radius:4px; transform:rotate(-.4deg);
+  background: linear-gradient(90deg, transparent 22px, rgb(220 60 50 / .45) 22px 24px, transparent 24px), linear-gradient(#fffdf5, #f7f0dc);
+  box-shadow: 0 1px 0 #e7e0cc, 0 3px 0 #ddd5bd, 0 10px 18px rgb(60 45 10 / .18); color:#1b2333; }
+.board-wrap .table-wrap:has(.dp-sheet) .dp-sheet th, .board-wrap .table-wrap:has(.dp-sheet) .dp-sheet td { border-bottom-color: rgb(70 120 210 / .3); color:#1b2333; }
 .dp-sheet { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:.92rem; }
 .dp-sheet th, .dp-sheet td { padding:5px 8px; border-bottom:1px solid var(--line); text-align:left; }
 .dp-sheet .r { text-align:right; }

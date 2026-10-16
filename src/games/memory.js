@@ -167,7 +167,7 @@ export default {
 
   css: `
 .mm { display:grid; grid-template-columns:repeat(var(--mm-cols, 6),minmax(0,1fr)); gap:7px; width:min(100%,440px); margin-inline:auto; padding:10px; border-radius:18px;
-  background: radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--felt) 88%, #fff), var(--felt) 60%, color-mix(in srgb, var(--felt) 72%, #000));
+  background: var(--felt-tex), radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--felt) 88%, #fff), var(--felt) 60%, color-mix(in srgb, var(--felt) 72%, #000));
   box-shadow: inset 0 0 0 6px #6b3d1b, inset 0 0 0 8px #3a200c, inset 0 6px 16px rgb(0 0 0 / .3), 0 6px 0 #3a200c; }
 .mm-card { aspect-ratio:3/4; border:0; padding:0; background:none; cursor:pointer; perspective:600px; transform:rotate(var(--tilt)); transition: transform .2s; }
 .mm-card:not(:disabled):hover { transform:rotate(var(--tilt)) translateY(-3px); }
@@ -179,11 +179,15 @@ export default {
 /* Гръб: карирана шарка и ромб в средата, като колода карти. */
 .mm-back { border:2px solid #fff;
   background:
-    radial-gradient(circle at 50% 50%, #fff 0 9%, transparent 10%),
+    radial-gradient(circle at 50% 50%, #fff 0 19%, transparent 20%),
     conic-gradient(from 45deg at 50% 50%, transparent 0 25%, rgb(255 255 255 / .18) 0 50%, transparent 0 75%, rgb(255 255 255 / .18) 0) 0 0/10px 10px,
     linear-gradient(160deg, color-mix(in srgb, var(--accent) 85%, #fff), var(--accent) 50%, color-mix(in srgb, var(--accent) 70%, #000));
   box-shadow: 0 0 0 1px rgb(0 0 0 / .25), 0 3px 0 rgb(0 0 0 / .3), 0 5px 8px rgb(0 0 0 / .25); }
-.mm-front { transform: rotateY(180deg); background:linear-gradient(160deg,#fff,#f3efe6); border:2px solid #fff;
+.mm-back::after { content:'М'; position:absolute; inset:0; display:grid; place-items:center; font:800 clamp(.75rem,3.2vw,1.05rem)/1 var(--f-display); color:var(--accent); }
+.mm-front::before { content:''; position:absolute; inset:4px; border-radius:6px; border:1.5px solid rgb(120 100 60 / .25); pointer-events:none; }
+.mm-front::after { content:''; position:absolute; width:62%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle at 40% 35%, #fff, #efe7d6); box-shadow: inset 0 1px 3px rgb(0 0 0 / .15); z-index:-1; }
+.mm-front { isolation:isolate; text-shadow:0 2px 2px rgb(0 0 0 / .18); }
+.mm-front { transform: rotateY(180deg); background: var(--grain), linear-gradient(160deg,#fff,#f3efe6); border:2px solid #fff;
   box-shadow: 0 0 0 1px rgb(0 0 0 / .2), 0 3px 0 rgb(0 0 0 / .25), 0 5px 8px rgb(0 0 0 / .2);
   font-size:clamp(1.2rem,6vw,1.9rem); line-height:1; }
 .mm-card.peek .mm-front { box-shadow: 0 0 0 3px var(--sun), 0 3px 0 rgb(0 0 0 / .25); }

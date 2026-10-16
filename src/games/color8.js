@@ -277,11 +277,16 @@ export default {
       hand.dataset.fx = 'c8-hand';
       hand.setAttribute('aria-label', 'Твоите карти');
       const sorted = s.hands[meSeat].slice().sort((a, b) => card(a).color - card(b).color || KINDS.indexOf(card(a).kind) - KINDS.indexOf(card(b).kind));
-      for (const id of sorted) {
+      const mid = (sorted.length - 1) / 2;
+      for (const [k, id] of sorted.entries()) {
         const playable = myTurn && (s.pending === null || s.pending === id) && canPlayNow(s, id);
         const b = cardEl(id, make, 'button');
         b.type = 'button';
         b.classList.add('c8-in-hand');
+        // Ветрило: картите леко се завъртат около долния си край.
+        const off = sorted.length > 1 ? (k - mid) / Math.max(mid, 1) : 0;
+        b.style.setProperty('--fan', `${off * Math.min(14, sorted.length * 2)}deg`);
+        b.style.setProperty('--drop', `${Math.abs(off) * Math.min(14, sorted.length * 1.6)}px`);
         if (playable) b.classList.add('playable');
         if (id === s.pending) b.classList.add('drawn');
         if (newIds.has(id)) { b.dataset.fxFrom = 'c8-pile'; b.dataset.fxDelay = String([...newIds].indexOf(id) * 90); }
@@ -376,34 +381,49 @@ export default {
 .c8-fan i { width:16px; height:24px; margin-left:-7px; border-radius:4px; background:var(--board); border:2px solid var(--surface); }
 .c8-fan i:first-child { margin-left:0; }
 .c8-count { font-size:var(--step--1); color:var(--ink-2); font-variant-numeric:tabular-nums; }
-.c8-table { display:flex; align-items:center; justify-content:center; gap:16px; padding:18px 12px; margin-block:12px;
-  background:var(--felt); border-radius:var(--r-lg); width:100%; }
+.c8-table { display:flex; align-items:center; justify-content:center; gap:16px; padding:20px 12px; margin-block:12px; border-radius:22px; width:100%;
+  background: var(--felt-tex), radial-gradient(120% 90% at 50% 35%, color-mix(in srgb, var(--felt) 85%, #fff), var(--felt) 55%, color-mix(in srgb, var(--felt) 72%, #000));
+  box-shadow: inset 0 0 0 7px #6b3d1b, inset 0 0 0 9px #3a200c, inset 0 6px 18px rgb(0 0 0 / .35), 0 6px 0 #3a200c; }
 .c8-pile { position:relative; border:0; padding:0; background:none; cursor:pointer; }
 .c8-pile:disabled { cursor:default; opacity:.85; }
-.c8-back { display:block; width:64px; height:92px; border-radius:10px; border:3px solid #fff;
-  background:repeating-linear-gradient(45deg, var(--board) 0 6px, color-mix(in srgb, var(--board) 70%, #fff) 6px 9px); box-shadow:0 4px 0 rgb(0 0 0 / .3); }
+.c8-back { position:relative; display:block; width:64px; height:92px; border-radius:10px; border:3px solid #fff;
+  background:
+    radial-gradient(ellipse 34% 24% at 50% 50%, #fff 0 92%, transparent 96%),
+    repeating-linear-gradient(45deg, rgb(255 255 255 / .16) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / .16) 0 2px, transparent 2px 7px),
+    linear-gradient(160deg, color-mix(in srgb, var(--board) 80%, #fff), var(--board));
+  /* Дебелина на тестето: ръбовете на картите отдолу. */
+  box-shadow: 1px 1px 0 #e9e4d8, 2px 2px 0 #c9c2b0, 3px 3px 0 #ece7db, 4px 4px 0 #bdb5a2, 5px 5px 0 #e6e0d2, 6px 7px 8px rgb(0 0 0 / .35); }
+.c8-back::after { content:'М'; position:absolute; inset:0; display:grid; place-items:center; font:800 1.25rem/1 var(--f-display); color:var(--board); }
 .c8-pile:not(:disabled):hover .c8-back { transform:translateY(-3px); }
 .c8-pile-n { position:absolute; right:-6px; top:-6px; background:var(--surface); color:var(--ink); border:2px solid var(--ink); border-radius:999px; font-size:.75rem; font-weight:700; padding:0 6px; font-variant-numeric:tabular-nums; }
 .c8-card { --c: var(--seat-1); width:64px; height:92px; flex:none; border-radius:10px; border:3px solid #fff; background:var(--c); color:#fff;
   display:grid; place-items:center; font:800 1.6rem/1 var(--f-display); text-shadow:0 2px 0 rgb(0 0 0 / .25); box-shadow:0 4px 0 rgb(0 0 0 / .25); position:relative; }
-.c8-card .corner { position:absolute; top:5px; left:7px; font-size:.75rem; }
+.c8-card .corner { position:absolute; top:5px; left:7px; font-size:.75rem; z-index:1; }
+.c8-card .corner.br { top:auto; left:auto; bottom:5px; right:7px; transform:rotate(180deg); }
+.c8-card .oval { position:absolute; inset:18% 8%; border-radius:50%; background:#fff; transform:rotate(-28deg); box-shadow: inset 0 0 0 2px rgb(0 0 0 / .06); }
+.c8-card .val { position:relative; z-index:1; color:var(--c);
+  text-shadow: -1.5px -1.5px 0 #1b2333, 1.5px -1.5px 0 #1b2333, -1.5px 1.5px 0 #1b2333, 1.5px 1.5px 0 #1b2333, 0 3px 0 #1b2333; }
+.c8-card.light .val { text-shadow: -1.5px -1.5px 0 #1b2333, 1.5px -1.5px 0 #1b2333, -1.5px 1.5px 0 #1b2333, 1.5px 1.5px 0 #1b2333, 0 3px 0 #1b2333; }
+.c8-card.wild .oval { background:#1b2333; }
 .c8-card::before { content:''; position:absolute; inset:0; border-radius:7px; pointer-events:none;
   background:linear-gradient(140deg, rgb(255 255 255 / .32), rgb(255 255 255 / 0) 38%, rgb(0 0 0 / 0) 70%, rgb(0 0 0 / .12)); }
 .c8-card.light { color:#1b2333; text-shadow:none; }
 .c8-card.wild { background:conic-gradient(var(--seat-1) 0 25%, var(--seat-2) 0 50%, var(--seat-3) 0 75%, var(--seat-4) 0); }
-.c8-card.wild .val { background:#fff; color:#1b2333; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; text-shadow:none; }
+.c8-card.wild .val { background:#fff; color:#1b2333; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; text-shadow:none; box-shadow:0 2px 0 rgb(0 0 0 / .3); }
 .c8-top { width:76px; height:108px; font-size:2rem; }
 @keyframes c8in { from { transform:translateY(-14px) rotate(-8deg); opacity:.4; } }
 .c8-color { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; background:var(--c); color:#fff; font-weight:700; font-size:.75rem; box-shadow:inset 0 0 0 4px rgb(255 255 255 / .6); text-shadow:0 1px 0 rgb(0 0 0 / .3); }
 .c8-msg { text-align:center; min-height:1.5em; color:var(--ink-2); font-weight:500; }
 .c8-hand-wrap { width:100%; display:grid; gap:10px; justify-items:center; }
-.c8-hand { display:flex; overflow-x:auto; max-width:100%; padding:18px 6px 10px; scroll-snap-type:x proximity; }
-.c8-in-hand { cursor:pointer; scroll-snap-align:center; transition:transform .12s ease; }
+.c8-hand { display:flex; overflow-x:auto; max-width:100%; padding:26px 16px 30px; scroll-snap-type:x proximity; }
+.c8-in-hand { cursor:pointer; scroll-snap-align:center; transition:transform .16s cubic-bezier(.2,1.3,.4,1); transform-origin:50% 120%;
+  transform: rotate(var(--fan, 0deg)) translateY(calc(var(--drop, 0px) + var(--lift, 0px))); }
 .c8-in-hand + .c8-in-hand { margin-left:-22px; }
 .c8-in-hand:disabled { cursor:default; }
 .c8-hand.my-turn .c8-in-hand:disabled { filter:saturate(.4) brightness(.9); }
-.c8-in-hand.playable { transform:translateY(-12px); }
-.c8-in-hand.playable:hover { transform:translateY(-16px); }
+.c8-in-hand.playable { --lift:-12px; }
+.c8-in-hand.playable:hover { --lift:-20px; }
 .c8-in-hand.drawn { outline:3px solid var(--sun); outline-offset:2px; }
 .c8-in-hand:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 .c8-after-draw { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center; text-align:center; }
@@ -435,7 +455,8 @@ function cardEl(id, make, tag = 'div') {
   if (c.color >= 0 && c.kind !== '8') el.style.setProperty('--c', `var(--seat-${c.color + 1})`);
   if (c.color === 2 && c.kind !== '8') el.classList.add('light');
   const label = LABEL[c.kind] ?? c.kind;
-  el.append(make('span', 'corner', label), make('span', 'val', label));
+  // Като истинска карта: индекс в два ъгъла и наклонен овал в средата.
+  el.append(make('span', 'oval'), make('span', 'corner', label), make('span', 'corner br', label), make('span', 'val', label));
   return el;
 }
 
