@@ -28,6 +28,55 @@ const dropRow = (board, col) => {
 
 const validCols = (s) => [...Array(COLS).keys()].filter((c) => dropRow(s.board, c) !== -1);
 
+// Търсене (negamax с алфа-бета) за трудния бот. Детерминистично: същата позиция → същият ход.
+const ORDER = [3, 2, 4, 1, 5, 0, 6];
+function evalWindow(cells, who) {
+  let mine = 0, theirs = 0;
+  for (const v of cells) { if (v === who) mine++; else if (v !== null) theirs++; }
+  if (mine && theirs) return 0;
+  if (mine === 3) return 5; if (mine === 2) return 2;
+  if (theirs === 3) return -4; if (theirs === 2) return -1;
+  return 0;
+}
+function evalC4(b, who) {
+  let v = 0;
+  for (let r = 0; r < ROWS; r++) if (b[r * COLS + 3] === who) v += 3; else if (b[r * COLS + 3] !== null) v -= 3;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) for (const [dc, dr] of DIRS) {
+    const ec = c + dc * 3, er = r + dr * 3;
+    if (ec < 0 || ec >= COLS || er < 0 || er >= ROWS) continue;
+    v += evalWindow([0, 1, 2, 3].map((k) => b[(r + dr * k) * COLS + c + dc * k]), who);
+  }
+  return v;
+}
+function negamax(b, who, depth, alpha, beta) {
+  if (depth === 0) return evalC4(b, who);
+  let any = false;
+  for (const c of ORDER) {
+    const r = dropRow(b, c);
+    if (r === -1) continue;
+    any = true;
+    b[r * COLS + c] = who;
+    const won = findLine(b, c, r);
+    const v = won ? 10000 + depth : -negamax(b, 1 - who, depth - 1, -beta, -alpha);
+    b[r * COLS + c] = null;
+    if (v > alpha) alpha = v;
+    if (alpha >= beta) break;
+  }
+  return any ? alpha : 0;
+}
+function searchC4(b, who, depth) {
+  let best = null, bestV = -Infinity;
+  for (const c of ORDER) {
+    const r = dropRow(b, c);
+    if (r === -1) continue;
+    b[r * COLS + c] = who;
+    const v = findLine(b, c, r) ? 100000 : -negamax(b, 1 - who, depth - 1, -Infinity, -bestV);
+    b[r * COLS + c] = null;
+    if (v > bestV) { bestV = v; best = c; }
+  }
+  return best;
+}
+
 export default {
   id: 'connect4',
   name: 'Четири в редица',
@@ -77,8 +126,9 @@ export default {
   autoMove: (s, p, rng) => ({ col: rng.pick(validCols(s)) }),
 
   // Хитър бот: печели, ако може; блокира; не подава победа; предпочита центъра.
-  botMove(s, p, rng) {
+  botMove(s, p, rng, level = 'medium') {
     const me = s.turn;
+    if (level === 'hard') return { col: searchC4(s.board.slice(), me, 6) };
     const cols = validCols(s);
     const after = (board, who, c) => { const r = dropRow(board, c); const b = board.slice(); b[r * COLS + c] = who; return { b, r }; };
     const wins = (board, who, c) => { if (dropRow(board, c) === -1) return false; const { b, r } = after(board, who, c); return Boolean(findLine(b, c, r)); };

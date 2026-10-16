@@ -52,8 +52,10 @@ export default {
   },
 
   // Хитър бот: помни всичко обърнато.
-  botMove(s, p, rng) {
-    const seen = s.seen ?? {};
+  botMove(s, p, rng, level = 'medium') {
+    // Средният бот помни около половината обърнати карти, трудният помни всичко.
+    const all = s.seen ?? {};
+    const seen = level === 'hard' ? all : Object.fromEntries(Object.entries(all).filter(([i]) => createRng(`${i}:${s.scores.join()}`).next() < 0.5));
     const free = [...Array(N).keys()].filter((i) => s.owner[i] === null && !s.open.includes(i));
     const unseen = free.filter((i) => seen[i] === undefined);
     if (s.open.length === 1) {

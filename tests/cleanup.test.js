@@ -7,7 +7,7 @@ import c4 from '../src/games/connect4.js';
 
 const DAY = 24 * 3600 * 1000;
 
-test('почистване: трие само стаи без активност от 30 дни, заедно с поддокументите им', async () => {
+test('почистване: трие само стаи без активност от 14 дни, заедно с поддокументите им', async () => {
   let clock = 1_000_000_000_000;
   const store = createLocalStore({ me: 'alice' });
   const api = createApi(store, { now: () => clock });
@@ -19,16 +19,16 @@ test('почистване: трие само стаи без активност
   await api.sendMove(old, 1, { col: 3 }, 0);
   await api.sendChat(old, [], { text: 'здрасти' });
 
-  clock += 20 * DAY;
+  clock += 10 * DAY;
   const active = await api.createRoom({ gameId: 'reversi', profile });
 
-  // Стара по създаване, но с ход преди 5 дни → остава.
-  clock -= 20 * DAY;
+  // Стара по създаване, но с чат преди 2 дни → остава.
+  clock -= 10 * DAY;
   const revived = await api.createRoom({ gameId: 'dots', profile });
-  clock += 35 * DAY;
+  clock += 18 * DAY;
   await api.sendChat(revived, [], { text: 'още сме тук' });
 
-  clock += 5 * DAY; // сега: old е на 40 дни, active на 20, revived има чат преди 5 дни
+  clock += 2 * DAY; // сега: old е на 20 дни, active на 10, revived има чат преди 2 дни
   const deleted = await sweepRooms(store, { now: clock });
   assert.deepEqual(deleted, [old]);
   assert.equal(await store.get(`rooms/${old}`), null);
@@ -37,7 +37,7 @@ test('почистване: трие само стаи без активност
   assert.deepEqual(await store.list(`rooms/${old}/chat`), []);
   assert.ok(await store.get(`rooms/${active}`));
   assert.ok(await store.get(`rooms/${revived}`));
-  assert.equal(MAX_AGE_MS, 30 * DAY);
+  assert.equal(MAX_AGE_MS, 14 * DAY);
 });
 
 test('почистване: личните тайни за изчезнали или стари рундове се трият', async () => {

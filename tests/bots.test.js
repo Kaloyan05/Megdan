@@ -50,6 +50,31 @@ test('хитрият бот бие лесния в Четири в редица 
   }
 });
 
+test('трудният бот бие средния в Четири в редица и Реверси', async () => {
+  for (const id of ['connect4', 'reversi']) {
+    const game = GAMES.find((g) => g.id === id);
+    let wins = 0, losses = 0;
+    for (let k = 0; k < 8; k++) {
+      const levels = k % 2 ? ['medium', 'hard'] : ['hard', 'medium'];
+      const { r, players } = await botGame(game, 2, `hm-${id}-${k}`, levels);
+      const hard = players[levels.indexOf('hard')];
+      if (r.winner === hard) wins++; else if (r.winner !== 'draw') losses++;
+    }
+    assert.ok(wins > losses, `${id}: труден ${wins}, среден ${losses}`);
+  }
+});
+
+test('морски бой: трудният бот потопява по-бързо от лесния', async () => {
+  const game = GAMES.find((g) => g.id === 'battleship');
+  const shotsTo = async (level, seed) => {
+    const { s } = await botGame(game, 2, seed, [level, 'easy']);
+    return s.shots[0].length + (s.winner === 0 ? 0 : 100);
+  };
+  let hard = 0, easy = 0;
+  for (let k = 0; k < 4; k++) { hard += await shotsTo('hard', `bs-${k}`); easy += await shotsTo('easy', `bs-${k}`); }
+  assert.ok(hard < easy, `труден ${hard}, лесен ${easy}`);
+});
+
 test('ботове: имена и id', () => {
   const a = makeBot([]);
   const b = makeBot([a], 'easy');

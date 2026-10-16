@@ -49,7 +49,7 @@ function rulesList(game) {
 // Лист за игра от лобито: правила, таймер, „Създай стая“.
 export function openGameSheet(game, { onCreate, onSolo }) {
   let timerSec = 0;
-  let level = 'hard';
+  let level = 'medium';
   let count = 1;
   const maxBots = Math.min(game.maxPlayers - 1, 3);
   const solo = h('button', {

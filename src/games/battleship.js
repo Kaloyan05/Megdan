@@ -403,6 +403,22 @@ function huntCell(shots, rng, level) {
     const ok = cand.filter((c) => c >= 0 && c < N * N && !done.has(c));
     if (ok.length) return rng.pick(ok);
   }
+  if (level === 'hard' && free.length) {
+    // Карта на вероятностите: къде могат да са останалите кораби.
+    const sunkLens = shots.filter((x) => x.sunk).map((x) => x.sunk.length);
+    const left = FLEET.slice();
+    for (const l of sunkLens) left.splice(left.indexOf(l), 1);
+    const okCell = (c) => !done.has(c) && !near.has(c);
+    const heat = new Array(N * N).fill(0);
+    for (const len of left) {
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        if (x + len <= N) { const cs = [...Array(len).keys()].map((k) => y * N + x + k); if (cs.every(okCell)) cs.forEach((c) => heat[c]++); }
+        if (len > 1 && y + len <= N) { const cs = [...Array(len).keys()].map((k) => (y + k) * N + x); if (cs.every(okCell)) cs.forEach((c) => heat[c]++); }
+      }
+    }
+    const top = Math.max(...free.map((c) => heat[c]));
+    return rng.pick(free.filter((c) => heat[c] === top));
+  }
   const parity = free.filter((c) => (c % N + Math.floor(c / N)) % 2 === 0);
   return rng.pick(parity.length ? parity : free.length ? free : [...Array(N * N).keys()].filter((c) => !done.has(c)));
 }

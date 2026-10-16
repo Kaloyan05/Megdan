@@ -65,7 +65,7 @@ export default {
   autoMove: (s, p, rng) => ({ cell: rng.pick(validCells(s)) }),
 
   // Хитър бот: печели игра или малка дъска, блокира, не праща противника там, където печели.
-  botMove(s, p, rng) {
+  botMove(s, p, rng, level = 'medium') {
     const me = s.turn, opp = 1 - me;
     const cells = validCells(s);
     const canWinSmall = (cellsArr, b, who) => {
@@ -92,6 +92,14 @@ export default {
       else if (canWinSmall(next.cells, next.forced, opp)) v -= 30;
       if (c === 4) v += 2;
       if (b === 4) v += 3;
+      if (level === 'hard' && next.winner === null) {
+        // Може ли противникът да спечели играта или малка дъска веднага след този ход?
+        for (const j of validCells(next)) {
+          const after = this.applyMove(next, { cell: j }, s.players[opp]);
+          if (after.winner === opp) { v -= 5000; break; }
+          if (after.small[Math.floor(j / 9)] === opp && next.small[Math.floor(j / 9)] === null) v -= 6;
+        }
+      }
       return v;
     };
     return { cell: bestBy(cells, score) };

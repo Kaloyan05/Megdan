@@ -217,7 +217,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       const bot = isBot(id);
       const left = bot ? !botsOf().some((b) => b.id === id) : !activeMembers(view.members).some((m) => m.id === id);
       let sub = '';
-      if (bot) sub = `бот, ${BOT_LEVELS.find((l) => l.value === info.level)?.label.toLowerCase() ?? 'хитър'}`;
+      if (bot) sub = `бот, ${BOT_LEVELS.find((l) => l.value === info.level)?.label.toLowerCase() ?? 'среден'}`;
       if (id === room.hostId) sub = 'домакин';
       if (room.status === 'playing' && !inGame) sub = 'гледа';
       if (left) sub = 'излезе';
@@ -312,7 +312,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
           },
         },
           h('span', { class: 'picker-name', text: `${l.label} бот` }),
-          h('span', { class: 'muted', text: l.value === 'easy' ? 'Играе наслуки' : 'Мисли за хода' }),
+          h('span', { class: 'muted', text: l.hint }),
         ))),
       ],
     });
@@ -581,7 +581,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       const rm = view?.room;
       if (destroyed || !r || r.over || !rm || `${rm.round}:${r.nextIndex}` !== key) return;
       for (const id of rm.players.filter(isBot)) {
-        const level = botsOf().find((b) => b.id === id)?.level ?? 'hard';
+        const level = botsOf().find((b) => b.id === id)?.level ?? 'medium';
         const move = await botMove(r.game, r.state, id, { seed: rm.seed, index: r.nextIndex, level }).catch(() => null);
         if (!move || !r.game.validateMove(r.state, move, id).ok) continue;
         await api.sendBotMove(code, rm.round, id, view.log, move, r.nextIndex).catch(() => { botKey = ''; });

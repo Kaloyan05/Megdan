@@ -111,7 +111,7 @@ export default {
     return s;
   },
 
-  botMove(s, p, rng) {
+  botMove(s, p, rng, level = 'medium') {
     const course = COURSES[s.hole];
     const b = s.balls[s.turn];
     let best = null;
@@ -126,7 +126,7 @@ export default {
       }
     }
     // малка грешка, за да не е съвършен
-    const jitter = (rng.next() - 0.5) * 0.04;
+    const jitter = (rng.next() - 0.5) * (level === 'hard' ? 0.01 : 0.12);
     const len = Math.hypot(best.dx + jitter, best.dy) || 1;
     return { dx: r3((best.dx + jitter) / len), dy: r3(best.dy / len), power: best.power };
   },

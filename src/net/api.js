@@ -69,7 +69,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     },
 
     // Игра срещу компютъра: стая с ботове, стартира веднага.
-    async playVsBots({ game, timerSec = 0, profile, count = 1, level = 'hard' }) {
+    async playVsBots({ game, timerSec = 0, profile, count = 1, level = 'medium' }) {
       const bots = [];
       for (let k = 0; k < count; k++) bots.push(makeBot(bots, level));
       const code = await api.createRoom({ gameId: game.id, timerSec, profile, bots });
@@ -153,7 +153,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     setGame: (code, gameId) => store.update(roomPath(code), { gameId }),
 
     // ---- ботове (само домакинът) ----
-    async addBot(code, room, members, level = 'hard') {
+    async addBot(code, room, members, level = 'medium') {
       const bots = room.bots ?? [];
       if (activeMembers(members).length + bots.length >= ROOM_CAP) return { ok: false, reason: 'full' };
       await store.update(roomPath(code), { bots: [...bots, makeBot(bots, level)] });

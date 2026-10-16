@@ -36,6 +36,41 @@ export function validCells(board, who) {
 
 const count = (board, who) => board.filter((v) => v === who).length;
 
+// Минимакс с алфа-бета за трудния бот: позиционни тегла + подвижност.
+function playOn(board, idx, who) {
+  const b = board.slice();
+  b[idx] = who;
+  for (const i of flipsFor(board, idx, who)) b[i] = who;
+  return b;
+}
+function evalRv(b, who) {
+  let v = 0;
+  for (let i = 0; i < 64; i++) if (b[i] === who) v += WEIGHTS[i]; else if (b[i] !== null) v -= WEIGHTS[i];
+  return v + 4 * (validCells(b, who).length - validCells(b, 1 - who).length);
+}
+function rvNegamax(b, who, depth, alpha, beta) {
+  const moves = validCells(b, who);
+  if (depth === 0) return evalRv(b, who);
+  if (!moves.length) {
+    if (!validCells(b, 1 - who).length) { const d = count(b, who) - count(b, 1 - who); return d * 1000; }
+    return -rvNegamax(b, 1 - who, depth - 1, -beta, -alpha);
+  }
+  for (const m of moves) {
+    const v = -rvNegamax(playOn(b, m, who), 1 - who, depth - 1, -beta, -alpha);
+    if (v > alpha) alpha = v;
+    if (alpha >= beta) break;
+  }
+  return alpha;
+}
+function searchRv(board, who, depth) {
+  let best = null, bestV = -Infinity;
+  for (const m of validCells(board, who)) {
+    const v = -rvNegamax(playOn(board, m, who), 1 - who, depth - 1, -Infinity, -bestV);
+    if (v > bestV) { bestV = v; best = m; }
+  }
+  return best;
+}
+
 export default {
   id: 'reversi',
   name: 'Реверси',
@@ -78,7 +113,8 @@ export default {
   autoMove: (s, p, rng) => ({ cell: rng.pick(validCells(s.board, s.turn)) }),
 
   // Хитър бот: ъгли, ръбове, избягва полетата до ъглите, после повече обърнати.
-  botMove(s, p, rng) {
+  botMove(s, p, rng, level = 'medium') {
+    if (level === 'hard') return { cell: searchRv(s.board, s.turn, 3) };
     const cells = validCells(s.board, s.turn);
     const noise = cells.map(() => rng.next());
     return { cell: bestBy(cells, (i) => WEIGHTS[i] + flipsFor(s.board, i, s.turn).length * 1.5 + noise[cells.indexOf(i)]) };
