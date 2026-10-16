@@ -275,8 +275,9 @@ export default {
 .ld-piece.can { cursor:pointer; animation:ldpulse .8s ease-in-out infinite alternate; }
 .ld-piece.last { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--edge), 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); }
 .ld-piece:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-@keyframes ldpulse { from { transform:translateY(0); box-shadow:0 0 0 3px var(--sun), 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); }
-  to { transform:translateY(-3px) scale(1.06); box-shadow:0 0 0 6px var(--sun), 0 5px 0 var(--edge), 0 9px 8px rgb(0 0 0 / .3); } }
+/* Без transform: движещ се бутон е трудно докосваем (и нестабилен за тестовете). */
+@keyframes ldpulse { from { box-shadow:0 0 0 3px var(--sun), 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); }
+  to { box-shadow:0 0 0 7px var(--sun), 0 2px 0 var(--edge), 0 4px 5px rgb(0 0 0 / .35); } }
 .ld-art { display:grid; grid-template-columns:repeat(2,26px); gap:8px; padding:8px; border:2px solid var(--ink); border-radius:10px; background:var(--surface); }
 .ld-art span { width:26px; height:26px; border-radius:50%; border:2px solid var(--ink); }
 @media (prefers-reduced-motion: reduce) { .ld-piece.can { animation:none; } }

@@ -13,7 +13,7 @@ const tag = process.env.TAG ?? 'look';
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: Number(process.env.W ?? 360), height: Number(process.env.H ?? 780) }, deviceScaleFactor: 2,
-  colorScheme: process.env.DARK ? 'dark' : 'light',
+  colorScheme: process.env.DARK ? 'dark' : 'light', reducedMotion: process.env.RM ? 'reduce' : 'no-preference',
 });
 const p = await ctx.newPage();
 const errors = [];
