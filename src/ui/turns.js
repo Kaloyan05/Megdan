@@ -15,7 +15,7 @@ export function createTurnWatcher(api) {
 
   const summarize = (code, { room, log }) => {
     if (!room) return { code, gone: true };
-    const game = gameById(room.gameId);
+    const game = gameById(room.playGameId ?? room.gameId);
     const s = { code, room, game, current: null, over: false, winner: null, playing: room.status === 'playing' };
     if (game && room.status === 'playing' && room.round) {
       const r = replay(game, {

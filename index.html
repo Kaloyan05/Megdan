@@ -403,6 +403,21 @@ body.first-run .nav-bottom, body.first-run .nav-top { display: none; }
 .turn-banner-count { font: 800 1.4rem/1 var(--f-display); }
 .turn-banner-go { margin-left: auto; text-decoration: underline; white-space: nowrap; }
 
+.series-box { display: grid; gap: 8px; padding: 12px; border-radius: var(--r-md); background: var(--surface-2); }
+.series-box h3 { font-size: 1rem; }
+.series-list { margin: 0; padding-left: 1.4em; display: grid; gap: 2px; }
+.series-list li.done { color: var(--ink-2); text-decoration: line-through; }
+.series-list li.now { font-weight: 800; }
+.series-table { display: grid; gap: 4px; }
+.series-row { display: flex; align-items: center; gap: 8px; }
+.series-row.lead .series-name { font-weight: 800; }
+.series-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.series-pts { font-weight: 800; }
+.series-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.series-game { display: inline-flex; align-items: center; gap: 6px; }
+.series-n { min-width: 1.2em; font-weight: 800; }
+.series-n:empty { display: none; }
+.result-banner.champ { background: var(--accent); color: var(--accent-ink); }
 .lb-tabs { flex-wrap: nowrap; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
 .lb-tabs .btn { flex: none; }
 .lb-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }

@@ -162,6 +162,14 @@ async function route() {
         toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да започна игра. Опитай пак.', 4000);
       }
     },
+    onSeries: async (series) => {
+      try {
+        const c = await api.createRoom({ gameId: series.games?.[0] ?? 'connect4', profile, series });
+        go(c);
+      } catch (e) {
+        toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да създам стая. Опитай пак.', 4000);
+      }
+    },
     onCreate: async (gameId, timerSec = 0, options = {}) => {
       try {
         const c = await api.createRoom({ gameId, timerSec, profile, options });

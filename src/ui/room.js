@@ -9,6 +9,8 @@ import { activeMembers } from '../net/api.js';
 import { ARTIFACT_URL } from '../config.js';
 import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet, optionsControls, optionsSummary } from './sheet.js';
 import { isBot, botMove, BOT_LEVELS } from '../core/bots.js';
+import { seriesTotals, seriesDone, pickSeriesGames } from '../core/series.js';
+import { GAMES } from '../games/index.js';
 
 const REACTIONS = ['👍', '😂', '😮', '😡', '🎉', '❤️'];
 const HOST_GRACE_MS = 20000;
@@ -194,7 +196,8 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
 
   function computeResult() {
     const room = view.room;
-    const game = gameById(room.gameId);
+    // Изиграната игра (gameId може вече да сочи следващата).
+    const game = gameById(room.playGameId ?? room.gameId);
     if (!game || room.status !== 'playing' || !room.round) return null;
     return {
       game,
@@ -264,6 +267,30 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     return chips.length ? h('div', { class: 'h2h' }, h('span', { class: 'h2h-label', text: 'Ти срещу' }), chips) : null;
   }
 
+  // Вечер на игрите: списък с игрите и точките досега.
+  function seriesBox() {
+    const sr = view.room.series;
+    if (!sr) return null;
+    const totals = seriesTotals(sr);
+    const ids = [...new Set([...Object.keys(totals), ...view.room.players, ...activeMembers(view.members).map((m) => m.id)])];
+    const rows = ids.filter((id) => totals[id] !== undefined).sort((a, b) => (totals[b] ?? 0) - (totals[a] ?? 0));
+    const list = sr.games
+      ? h('ol', { class: 'series-list' }, sr.games.map((id, i) => h('li', {
+        class: i < (sr.index ?? 0) ? 'done' : i === (sr.index ?? 0) ? 'now' : '',
+        text: gameById(id)?.name ?? id,
+      })))
+      : h('p', { class: 'muted', text: `Изненада: ${sr.count} игри се теглят при старта, според броя играчи.` });
+    return h('div', { class: 'series-box' },
+      h('h3', { text: 'Вечер на игрите' }),
+      list,
+      rows.length > 0 && h('div', { class: 'series-table' }, rows.map((id, i) => h('div', { class: `series-row${i === 0 ? ' lead' : ''}` },
+        avatarEl(memberInfo(id), 'xs'),
+        h('span', { class: 'series-name', text: nickOf(id) }),
+        h('span', { class: 'series-pts num', text: `${totals[id]} т.` }),
+      ))),
+    );
+  }
+
   function lobbyPanel() {
     const room = view.room;
     const game = gameById(room.gameId);
@@ -274,14 +301,15 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const going = [...members.filter((m) => m.id === room.hostId || m.data.readyFor === room.round + 1).map((m) => m.id), ...botsOf().map((b) => b.id)];
     const n = going.length;
     let hint = `Ще играят: ${going.map(nickOf).join(', ')}.`;
-    const canStart = n >= game.minPlayers && n <= game.maxPlayers;
+    const surprise = room.series && !room.series.games;
+    const canStart = surprise ? n >= 2 : n >= game.minPlayers && n <= game.maxPlayers;
     if (n < game.minPlayers) {
       hint = members.length + botsOf().length < game.minPlayers
         ? 'Чакаме още играчи. Натисни „Покани“ горе или добави бот.'
         : 'Чакаме някой да натисне „Готов“.';
     }
     const canAddBot = amHost && members.length + botsOf().length < Math.min(game.maxPlayers, 6);
-    if (n > game.maxPlayers) hint = `${game.name} е за ${playersLabel(game)}. Готови са ${n}.`;
+    if (n > game.maxPlayers && !surprise) hint = `${game.name} е за ${playersLabel(game)}. Готови са ${n}.`;
 
     return h('section', { class: 'panel setup', 'aria-label': 'Подготовка' },
       h('div', { class: 'setup-game' },
@@ -289,12 +317,13 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
         h('div', {},
           h('h2', { text: game.name }),
           h('p', { class: 'muted', text: playersLabel(game) }),
-          amHost && h('button', {
+          amHost && !room.series && h('button', {
             class: 'btn btn-small btn-quiet', type: 'button', text: 'Смени играта',
             onClick: () => openGamePicker(room.gameId, (id) => api.setGame(code, id).catch(() => toast('Не успях да сменя играта.'))),
           }),
         ),
       ),
+      seriesBox(),
       amHost
         ? h('div', { class: 'field' },
           h('span', { class: 'field-label', text: 'Таймер за ход' }),
@@ -313,7 +342,14 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
             class: 'btn btn-primary', type: 'button', disabled: !canStart, text: 'Старт',
             onClick: async (e) => {
               e.currentTarget.disabled = true;
-              const res = await api.startGame(code, room, view.members, game).catch(() => ({ ok: false }));
+              let g = game;
+              if (surprise) {
+                const games = pickSeriesGames(GAMES, room.series.count ?? 3, n);
+                if (!games.length) { toast('Няма игри за толкова играчи.'); return; }
+                await api.seriesPick(code, room, games).catch(() => {});
+                g = gameById(games[0]);
+              }
+              const res = await api.startGame(code, room, view.members, g).catch(() => ({ ok: false }));
               if (!res.ok) toast('Не успях да стартирам. Опитай пак.');
             },
           })
@@ -358,8 +394,31 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     return { game, ready, waiting, fits };
   }
 
+  function seriesFinalPanel() {
+    const room = view.room;
+    const totals = seriesTotals(room.series);
+    const top = Math.max(...Object.values(totals));
+    const champs = Object.keys(totals).filter((id) => totals[id] === top);
+    const amHost = room.hostId === me;
+    return h('section', { class: 'panel rematch', 'aria-label': 'Край на вечерта' },
+      h('div', { class: 'result-banner champ' }, h('div', {},
+        h('h2', { text: champs.length > 1 ? 'Шампиони на вечерта' : 'Шампион на вечерта' }),
+        h('p', { text: `${champs.map(nickOf).join(' и ')}, ${top} т.` }),
+      )),
+      seriesBox(),
+      amHost
+        ? h('div', { class: 'actions' },
+          h('button', { class: 'btn btn-primary', type: 'button', text: 'Нова вечер', onClick: () => api.seriesRestart(code, room).catch(() => toast('Не успях.')) }),
+          h('button', { class: 'btn', type: 'button', text: 'Край на вечерта', onClick: () => api.seriesEnd(code).catch(() => toast('Не успях.')) }),
+        )
+        : h('p', { class: 'hint', text: 'Домакинът решава дали да започне нова вечер.' }),
+    );
+  }
+
   function rematchPanel() {
     const room = view.room;
+    if (room.series && seriesDone(room.series)) return seriesFinalPanel();
+    if (room.series && room.series.recorded !== room.round) return h('p', { class: 'hint', text: 'Записвам точките...' });
     const amHost = room.hostId === me;
     const { game, ready, waiting, fits } = rematchState();
     const iReady = ready.includes(me);
@@ -370,19 +429,24 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     return h('section', { class: 'panel rematch', 'aria-label': 'Реванш' },
       h('div', { class: 'actions' },
         h('button', {
-          class: `btn ${iReady ? '' : 'btn-primary'}`, type: 'button', text: iReady ? 'Отказвам' : 'Реванш',
+          class: `btn ${iReady ? '' : 'btn-primary'}`, type: 'button', text: iReady ? 'Отказвам' : room.series ? 'Следваща игра' : 'Реванш',
           onClick: () => { sound.tap(); api.setReady(code, room, view.members, !iReady).catch(() => toast(NO_WRITE)); },
         }),
         amHost && waiting.length > 0 && fits && h('button', {
           class: 'btn btn-small', type: 'button', text: 'Започни с готовите',
           onClick: () => api.startGame(code, room, view.members, game, ready).catch(() => toast('Не успях да стартирам.')),
         }),
-        amHost && h('button', {
+        amHost && !room.series && h('button', {
           class: 'btn btn-small btn-quiet', type: 'button', text: 'Смени играта',
           onClick: () => openGamePicker(room.gameId, (id) => api.setGame(code, id).catch(() => {})),
         }),
+        amHost && room.series && !fits && h('button', {
+          class: 'btn btn-small', type: 'button', text: 'Пропусни играта',
+          onClick: () => api.seriesSkip(code, room).catch(() => {}),
+        }),
       ),
-      h('p', { class: 'hint', text: `${hint} Следваща игра: ${game.name}.${game.options?.length ? ` Правила: ${optionsSummary(game, room.options?.[game.id])}.` : ''}` }),
+      seriesBox(),
+      h('p', { class: 'hint', text: `${hint} ${room.series ? `Игра ${(room.series.index ?? 0) + 1} от ${room.series.games.length}` : 'Следваща игра'}: ${game.name}.${game.options?.length ? ` Правила: ${optionsSummary(game, room.options?.[game.id])}.` : ''}` }),
       h2hRow(game.id),
     );
   }
@@ -402,7 +466,9 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   function renderStage() {
     const room = view.room;
     const game = gameById(room.gameId);
-    gameLabel.textContent = game?.name ?? '';
+    const shown = gameById(room.status === 'playing' && result && !result.over ? room.playGameId ?? room.gameId : room.gameId);
+    const sr = room.series;
+    gameLabel.textContent = `${shown?.name ?? ''}${sr?.games && !seriesDone(sr) ? `, игра ${Math.min((sr.index ?? 0) + 1, sr.games.length)} от ${sr.games.length}` : ''}`;
     if (room.status !== 'playing' || !result) {
       mount(stageEl, lobbyPanel());
       return;
@@ -539,7 +605,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
 
     if (result?.over && room.players.includes(me) && recordedRound !== room.round) {
       recordedRound = room.round;
-      api.recordResult(code, room, result, room.gameId).then((r) => {
+      api.recordResult(code, room, result, room.playGameId ?? room.gameId).then((r) => {
         loadMyStats();
         if (r) toast(`Рейтинг ${r.delta >= 0 ? '+' : ''}${r.delta}`);
       }).catch(() => { recordedRound = 0; });
@@ -576,8 +642,14 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       }
     }
 
+    // Вечер на игрите: домакинът записва точките и минава към следващата игра.
+    const sr = room.series;
+    if (sr?.games && result?.over && room.hostId === me && sr.recorded !== room.round && sr.games[sr.index ?? 0] === room.playGameId) {
+      api.seriesRecord(code, room, result.placements).catch(() => {});
+    }
+    const seriesWaits = sr && (seriesDone(sr) || sr.recorded !== room.round);
     // Реванш: домакинът стартира, когато всички от последната партида са готови.
-    if (result?.over && room.hostId === me && autoStartFor !== room.round) {
+    if (result?.over && room.hostId === me && autoStartFor !== room.round && !seriesWaits) {
       const { game, ready, waiting, fits } = rematchState();
       if (!waiting.length && fits) {
         autoStartFor = room.round;
@@ -588,6 +660,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     renderSeats();
     const key = JSON.stringify([
       room.status, room.round, room.gameId, room.timerSec, room.hostId, acc, result?.over, pending, resignArmed, JSON.stringify(room.options ?? {}),
+      JSON.stringify(room.series ?? null),
       secret.loaded, Object.keys(reveals).length,
       activeMembers(view.members).map((m) => [m.id, m.data.readyFor, m.data.nick, m.data.avatar]),
     ]);

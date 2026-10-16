@@ -54,14 +54,14 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     getStats: async (id = me) => (await store.get(`stats/${id}`)) ?? { rating: START_RATING, w: 0, l: 0, d: 0, games: {}, played: [] },
 
     // ---- стаи ----
-    async createRoom({ gameId, timerSec = 0, profile, bots = [], options = {} }) {
+    async createRoom({ gameId, timerSec = 0, profile, bots = [], options = {}, series = null }) {
       for (let attempt = 0; attempt < 8; attempt++) {
         const code = randomCode(rand);
         if (await store.get(roomPath(code))) continue;
         await store.set(roomPath(code), {
           code, gameId, timerSec, hostId: me, status: 'lobby', round: 0,
           seed: null, players: [], ratings: {}, startedAt: null, createdAt: now(), bots,
-          options: { [gameId]: options },
+          options: { [gameId]: options }, series,
         });
         await api.joinRoom(code, profile);
         return code;
@@ -169,6 +169,26 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       await store.set(`${roomPath(code)}/r${round}/${botId}`, { moves: [...prev, { i: nextIndex, t: now(), m: move }] });
     },
     setTimer: (code, timerSec) => store.update(roomPath(code), { timerSec }),
+
+    // ---- Вечер на игрите (само домакинът пише) ----
+    // Записва резултата от рунда и минава към следващата игра от поредицата.
+    async seriesRecord(code, room, placements) {
+      const sr = room.series;
+      if (!sr || sr.recorded === room.round) return;
+      const results = [...(sr.results ?? []), { round: room.round, placements }];
+      const index = (sr.index ?? 0) + 1;
+      const next = sr.games[index];
+      await store.update(roomPath(code), { series: { ...sr, results, index, recorded: room.round }, ...(next ? { gameId: next } : {}) });
+    },
+    seriesRestart: (code, room) => store.update(roomPath(code), { series: { ...room.series, index: 0, results: [], recorded: room.round }, gameId: room.series.games[0] }),
+    seriesEnd: (code) => store.update(roomPath(code), { series: null }),
+    async seriesSkip(code, room) {
+      const sr = room.series;
+      const index = (sr.index ?? 0) + 1;
+      await store.update(roomPath(code), { series: { ...sr, index }, ...(sr.games[index] ? { gameId: sr.games[index] } : {}) });
+    },
+    // Изненада: игрите се избират при първия старт, според броя играчи.
+    seriesPick: (code, room, games) => store.update(roomPath(code), { series: { ...room.series, games, index: 0, results: [] }, gameId: games[0] }),
     // Вариации на правилата: пазят се по игра, важат от следващия старт.
     setOptions: (code, room, gameId, opts) => store.update(roomPath(code), { options: { ...(room.options ?? {}), [gameId]: opts } }),
 
@@ -185,7 +205,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       for (const p of players) ratings[p] = isBot(p) ? START_RATING : (await api.getStats(p)).rating ?? START_RATING;
       await store.update(roomPath(code), {
         status: 'playing', round: room.round + 1, seed: newSeed(),
-        players, ratings, startedAt: now(), gameId: game.id,
+        players, ratings, startedAt: now(), gameId: game.id, playGameId: game.id,
         gameOptions: optionsFor(game, room.options?.[game.id]),
       });
       return { ok: true };

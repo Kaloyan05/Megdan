@@ -4,9 +4,9 @@ import { h, mount, storageGet } from './dom.js';
 import { sound } from './sound.js';
 import { GAMES, playersLabel } from '../games/index.js';
 import { normalizeCode } from '../net/api.js';
-import { openGameSheet } from './sheet.js';
+import { openGameSheet, openSeriesSheet } from './sheet.js';
 
-export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, onCreate, onSolo }) {
+export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, onCreate, onSolo, onSeries }) {
   const err = h('p', { class: 'error', id: 'code-error', hidden: true });
   const codeInput = h('input', {
     class: 'input code-input', id: 'code', inputMode: 'text', autocomplete: 'off', autocapitalize: 'characters',
@@ -81,6 +81,7 @@ export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, o
           h('p', { class: 'muted', text: 'Направи стая, прати кода на приятел и започвайте.' }),
           h('div', { class: 'actions' },
             h('button', { class: 'btn btn-sun', type: 'button', text: 'Бърза игра', onClick: quick }),
+            onSeries && h('button', { class: 'btn', type: 'button', text: 'Вечер на игрите', onClick: () => openSeriesSheet({ onCreate: onSeries }) }),
           ),
           h('p', { class: 'hint', text: 'Бърза игра избира игра вместо теб. Или избери долу, за да видиш правилата.' }),
         ),
