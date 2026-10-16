@@ -29,7 +29,7 @@ async function botGame(game, n, seed, levels) {
   return { s, r, players };
 }
 
-for (const game of GAMES) {
+for (const game of GAMES.filter((g) => !g.realtime)) {
   test(`бот: ${game.name} — цяла партида само с ботове`, async () => {
     await botGame(game, game.minPlayers === 2 && game.maxPlayers > 2 ? 3 : game.minPlayers, `b-${game.id}`, ['hard', 'easy', 'hard']);
   });

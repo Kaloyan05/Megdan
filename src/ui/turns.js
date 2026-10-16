@@ -19,7 +19,7 @@ export function createTurnWatcher(api) {
     const s = { code, room, game, current: null, over: false, winner: null, playing: room.status === 'playing' };
     if (game && room.status === 'playing' && room.round) {
       const r = replay(game, {
-        seed: room.seed, players: room.players, log, options: room.gameOptions, startedAt: room.startedAt, turnLimitMs: (room.timerSec || 0) * 1000,
+        seed: room.seed, players: room.players, log, options: room.gameOptions, startedAt: room.startedAt, turnLimitMs: game.realtime ? 0 : (room.timerSec || 0) * 1000,
       });
       Object.assign(s, { current: r.current, over: r.over, winner: r.winner, state: r.state });
     }

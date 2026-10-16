@@ -206,7 +206,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       game,
       ...replay(game, {
         seed: room.seed, players: room.players, log: view.log, options: room.gameOptions,
-        startedAt: room.startedAt, turnLimitMs: (room.timerSec || 0) * 1000,
+        startedAt: room.startedAt, turnLimitMs: game.realtime ? 0 : (room.timerSec || 0) * 1000,
       }),
     };
   }
@@ -327,7 +327,9 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
         ),
       ),
       seriesBox(),
-      amHost
+      game.realtime
+        ? h('p', { class: 'muted', text: 'На живо: без таймер за ход. Двамата трябва да сте в стаята едновременно.' })
+        : amHost
         ? h('div', { class: 'field' },
           h('span', { class: 'field-label', text: 'Таймер за ход' }),
           pillGroup('Таймер за ход', TIMERS.map((t) => ({ value: t.sec, label: t.label })), room.timerSec || 0,
@@ -480,14 +482,16 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const boardEl = h('div', { class: 'board-wrap' });
     const myTurn = result.current === me;
     const status = h('div', { class: `status-line${myTurn ? ' mine' : ''}` },
-      h('span', { class: 'disc-dot', '--disc': `var(--seat-${room.players.indexOf(result.current) + 1})`, 'aria-hidden': 'true' }),
+      result.current != null && h('span', { class: 'disc-dot', '--disc': `var(--seat-${room.players.indexOf(result.current) + 1})`, 'aria-hidden': 'true' }),
       h('span', { text: playedGame.status?.(result.state, me, nickOf) ?? (myTurn ? 'Твой ход' : `Ход на ${nickOf(result.current)}`) }),
       timerEl,
     );
-    if (scratch.round !== room.round) scratch = { round: room.round };
+    if (scratch.round !== room.round) { scratch.dispose?.(); scratch = { round: room.round }; }
     playedGame.render(boardEl, result.state, {
       me, over: result.over || pending, players: room.players, nickOf, sound, toast, scratch,
       onMove: (move) => sendMove(move),
+      joinLive: () => api.store.joinRealtime(`rt-${code.toLowerCase()}-${room.round}`),
+      botLevel: (id) => botsOf().find((b) => b.id === id)?.level ?? 'medium',
       secret: secretApi(room.round),
       reveals: Object.fromEntries(Object.entries(reveals).filter(([, v]) => v.round === room.round)),
     });
@@ -700,7 +704,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   // ---- таймер ----
   function tickTimer() {
     const room = view?.room;
-    if (!room || !result || result.over || !room.timerSec) { timerEl.hidden = true; return; }
+    if (!room || !result || result.over || !room.timerSec || result.game.realtime) { timerEl.hidden = true; return; }
     const left = result.turnStartedAt + room.timerSec * 1000 - Date.now();
     const sec = Math.max(0, Math.ceil(left / 1000));
     timerEl.hidden = false;
@@ -755,6 +759,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
 
   return () => {
     destroyed = true;
+    scratch.dispose?.();
     unwatch();
     unwatchReveals();
     presence.leave();

@@ -4,12 +4,18 @@
 
 const PREFIX = 'megdan:';
 
-export function createLocalStore({ me, storage = null, channel = null } = {}) {
+export function createLocalStore({ me, storage = null, channel = null, lagMs = 0 } = {}) {
   const docs = new Map();
   const docSubs = new Map(); // path → Set(cb)
   const colSubs = new Map(); // collectionPath → Set(cb)
   const peers = new Map(); // roomName → Map(id → lastSeen)
   const peerSubs = new Map(); // roomName → Set(cb)
+  const rtRooms = new Map(); // име → { peers: Map(id → presence), subs: Set(cb) }
+  const rtRoom = (name) => {
+    if (!rtRooms.has(name)) rtRooms.set(name, { peers: new Map(), subs: new Set() });
+    return rtRooms.get(name);
+  };
+  const rtEmit = (name) => { const r = rtRoom(name); for (const cb of r.subs) cb(new Map(r.peers)); };
 
   if (storage) {
     for (let i = 0; i < storage.length; i++) {
@@ -59,6 +65,14 @@ export function createLocalStore({ me, storage = null, channel = null } = {}) {
         if (!peers.has(msg.room)) peers.set(msg.room, new Map());
         if (msg.gone) peers.get(msg.room).delete(msg.id); else peers.get(msg.room).set(msg.id, Date.now());
         emitPeers(msg.room);
+      }
+      if (msg.kind === 'rt') {
+        const run = () => {
+          const r = rtRoom(msg.room);
+          if (msg.data === null) r.peers.delete(msg.id); else r.peers.set(msg.id, msg.data);
+          rtEmit(msg.room);
+        };
+        if (lagMs) setTimeout(run, lagMs); else run();
       }
     };
   }
@@ -113,6 +127,35 @@ export function createLocalStore({ me, storage = null, channel = null } = {}) {
           clearInterval(timer);
           peerSubs.get(name)?.delete(cb);
           channel?.postMessage({ kind: 'here', room: name, id: me, gone: true });
+        },
+      };
+    },
+
+    // Игри на живо: всеки държи един обект (присъствие), който другите виждат почти веднага.
+    // cb(Map id → обект). Изпраща се най-много ~30 пъти в секунда, като в claude.ai.
+    async joinRealtime(name) {
+      const r = rtRoom(name);
+      let mine = {};
+      let timer = null;
+      let lastSent = 0;
+      const flush = () => {
+        timer = null; lastSent = Date.now();
+        channel?.postMessage({ kind: 'rt', room: name, id: me, data: mine });
+      };
+      // Повтаря се, за да го видят и влезлите по-късно.
+      const keep = setInterval(() => channel?.postMessage({ kind: 'rt', room: name, id: me, data: mine }), 1000);
+      return {
+        setPresence(patch) {
+          mine = { ...mine, ...patch };
+          for (const k of Object.keys(patch)) if (patch[k] === null) delete mine[k];
+          r.peers.set(me, mine);
+          if (!timer) timer = setTimeout(flush, Math.max(0, 33 - (Date.now() - lastSent)));
+        },
+        onPeers(cb) { r.subs.add(cb); queueMicrotask(() => cb(new Map(r.peers))); return () => r.subs.delete(cb); },
+        leave() {
+          clearTimeout(timer); clearInterval(keep);
+          r.peers.delete(me); r.subs.clear();
+          channel?.postMessage({ kind: 'rt', room: name, id: me, data: null });
         },
       };
     },

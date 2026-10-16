@@ -62,7 +62,7 @@ export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, o
     h('div', { class: 'game-info' },
       h('h3', { text: g.name }),
       h('p', { class: 'muted', text: g.blurb }),
-      h('p', { class: 'game-meta', text: playersLabel(g) }),
+      h('p', { class: 'game-meta', text: g.realtime ? `${playersLabel(g)}, на живо` : playersLabel(g) }),
     ),
   ));
 

@@ -70,5 +70,27 @@ export async function createClaudeStore() {
         return { leave() {} };
       }
     },
+
+    // Игри на живо: именувана стая; всеки играч държи един обект в присъствието си.
+    async joinRealtime(name) {
+      if (!room) throw Object.assign(new Error('no room'), { code: 'not_permitted' });
+      const r = await room.join(name);
+      const subs = new Set();
+      const toMap = (peers) => {
+        const m = new Map();
+        for (const p of [...peers].sort((a, b) => a.updatedAt - b.updatedAt)) {
+          const id = p.by || p.presence?.id;
+          if (id) m.set(id, p.presence);
+        }
+        return m;
+      };
+      const off = r.onPeers((c) => { const m = toMap(c.peers); subs.forEach((cb) => cb(m)); }, () => {});
+      r.presence({ id: me }).catch(() => {});
+      return {
+        setPresence(patch) { r.presence(patch).catch(() => {}); },
+        onPeers(cb) { subs.add(cb); queueMicrotask(() => cb(toMap(r.peers()))); return () => subs.delete(cb); },
+        leave() { off(); subs.clear(); r.leave().catch(() => {}); },
+      };
+    },
   };
 }

@@ -20,5 +20,5 @@ export async function openStore() {
   let storage = null;
   try { storage = window.localStorage; } catch { /* без localStorage */ }
   const channel = 'BroadcastChannel' in window ? new BroadcastChannel('megdan') : null;
-  return createLocalStore({ me, storage, channel });
+  return createLocalStore({ me, storage, channel, lagMs: Number(params.get('lag')) || 0 });
 }
