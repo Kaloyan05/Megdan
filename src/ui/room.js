@@ -7,7 +7,8 @@ import { gameById, playersLabel } from '../games/index.js';
 import { replay } from '../core/engine.js';
 import { activeMembers } from '../net/api.js';
 import { ARTIFACT_URL } from '../config.js';
-import { TIMERS, pillGroup, openRulesSheet, openGamePicker } from './sheet.js';
+import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet } from './sheet.js';
+import { isBot, botMove, BOT_LEVELS } from '../core/bots.js';
 
 const REACTIONS = ['👍', '😂', '😮', '😡', '🎉', '❤️'];
 const HOST_GRACE_MS = 20000;
@@ -66,6 +67,9 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   let reveals = {};
   let revealedRound = 0;
   let onTurnFor = '';
+  let botKey = '';
+  let botTimer = null;
+  let botRevealRound = 0;
   const narrow = window.matchMedia('(max-width: 899px)');
 
   // ---- постоянни области ----
@@ -165,10 +169,23 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   );
 
   // ---- помощни ----
-  const memberInfo = (id) => view?.members.find((m) => m.id === id)?.data ?? { nick: 'Играч', avatar: '🙂', color: 2 };
+  const botsOf = () => view?.room?.bots ?? [];
+  const memberInfo = (id) => (isBot(id) ? botsOf().find((b) => b.id === id) : null)
+    ?? view?.members.find((m) => m.id === id)?.data ?? { nick: isBot(id) ? 'Бот' : 'Играч', avatar: isBot(id) ? '🤖' : '🙂', color: 2 };
   const nickOf = (id) => (id === me ? 'Ти' : memberInfo(id).nick || 'Играч');
-  const isOnline = (id) => !online || Date.now() - presenceSince < 5000 || online.has(id);
-  const readyIds = () => activeMembers(view.members).filter((m) => m.data.readyFor === view.room.round + 1).map((m) => m.id);
+  const isOnline = (id) => isBot(id) || !online || Date.now() - presenceSince < 5000 || online.has(id);
+  // Готови за следващия рунд: хората, натиснали „Готов“/„Реванш“, плюс ботовете.
+  const readyIds = () => [
+    ...activeMembers(view.members).filter((m) => m.data.readyFor === view.room.round + 1).map((m) => m.id),
+    ...botsOf().map((b) => b.id),
+  ];
+  // Кой пише ходовете на ботовете: домакинът, ако е тук, иначе първият присъстващ човек.
+  const amBotDriver = () => {
+    const room = view.room;
+    if (room.hostId === me) return true;
+    if (isOnline(room.hostId) && activeMembers(view.members).some((m) => m.id === room.hostId)) return false;
+    return activeMembers(view.members).find((m) => isOnline(m.id))?.id === me;
+  };
 
   function computeResult() {
     const room = view.room;
@@ -187,16 +204,20 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
   function renderSeats() {
     const room = view.room;
     const playing = room.status === 'playing' && result && !result.over;
+    const humans = activeMembers(view.members).map((m) => m.id);
     const ids = room.status === 'playing'
-      ? [...room.players, ...activeMembers(view.members).map((m) => m.id).filter((id) => !room.players.includes(id))]
-      : activeMembers(view.members).map((m) => m.id);
+      ? [...new Set([...room.players, ...humans, ...botsOf().map((b) => b.id)])]
+      : [...humans, ...botsOf().map((b) => b.id)];
+    const amHostHere = room.hostId === me && !playing;
     const ready = new Set(readyIds());
     mount(seatsEl, ids.map((id) => {
       const info = memberInfo(id);
       const seatIdx = room.players.indexOf(id);
       const inGame = room.status === 'playing' && seatIdx !== -1;
-      const left = !activeMembers(view.members).some((m) => m.id === id);
+      const bot = isBot(id);
+      const left = bot ? !botsOf().some((b) => b.id === id) : !activeMembers(view.members).some((m) => m.id === id);
       let sub = '';
+      if (bot) sub = `бот, ${BOT_LEVELS.find((l) => l.value === info.level)?.label.toLowerCase() ?? 'хитър'}`;
       if (id === room.hostId) sub = 'домакин';
       if (room.status === 'playing' && !inGame) sub = 'гледа';
       if (left) sub = 'излезе';
@@ -209,7 +230,11 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
           sub && h('div', { class: 'sub', text: sub }),
         ),
         inGame && h('span', { class: 'disc-dot', '--disc': `var(--seat-${seatIdx + 1})`, 'aria-hidden': 'true' }),
-        showReady && h('span', { class: 'badge ok', text: 'готов' }),
+        showReady && !bot && h('span', { class: 'badge ok', text: 'готов' }),
+        bot && amHostHere && !left && h('button', {
+          class: 'btn btn-icon btn-quiet seat-x', type: 'button', 'aria-label': `Махни ${info.nick}`, text: '✕',
+          onClick: () => api.removeBot(code, room, id).catch(() => toast('Не успях да махна бота.')),
+        }),
       );
     }));
   }
@@ -222,13 +247,16 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const members = activeMembers(view.members);
     const mine = members.find((m) => m.id === me);
     const iAmReady = amHost || mine?.data.readyFor === room.round + 1;
-    const going = members.filter((m) => m.id === room.hostId || m.data.readyFor === room.round + 1);
+    const going = [...members.filter((m) => m.id === room.hostId || m.data.readyFor === room.round + 1).map((m) => m.id), ...botsOf().map((b) => b.id)];
     const n = going.length;
-    let hint = `Ще играят: ${going.map((m) => nickOf(m.id)).join(', ')}.`;
+    let hint = `Ще играят: ${going.map(nickOf).join(', ')}.`;
     const canStart = n >= game.minPlayers && n <= game.maxPlayers;
     if (n < game.minPlayers) {
-      hint = members.length < game.minPlayers ? 'Чакаме още играчи. Натисни „Покани“ горе и прати кода на приятел.' : 'Чакаме някой да натисне „Готов“.';
+      hint = members.length + botsOf().length < game.minPlayers
+        ? 'Чакаме още играчи. Натисни „Покани“ горе или добави бот.'
+        : 'Чакаме някой да натисне „Готов“.';
     }
+    const canAddBot = amHost && members.length + botsOf().length < Math.min(game.maxPlayers, 6);
     if (n > game.maxPlayers) hint = `${game.name} е за ${playersLabel(game)}. Готови са ${n}.`;
 
     return h('section', { class: 'panel setup', 'aria-label': 'Подготовка' },
@@ -265,15 +293,36 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
             class: `btn ${iAmReady ? '' : 'btn-primary'}`, type: 'button', text: iAmReady ? 'Не съм готов' : 'Готов',
             onClick: () => { sound.tap(); api.setReady(code, room, view.members, !iAmReady).catch(() => toast(NO_WRITE)); },
           }),
+        canAddBot && h('button', { class: 'btn btn-small', type: 'button', text: 'Добави бот', onClick: () => openBotSheet() }),
       ),
     );
+  }
+
+  function openBotSheet() {
+    const sheet = openSheet({
+      title: 'Добави бот',
+      body: [
+        h('p', { class: 'muted', text: 'Ботът заема свободно място и играе сам. Партиите с бот не влизат в класацията.' }),
+        h('div', { class: 'picker-list' }, BOT_LEVELS.map((l) => h('button', {
+          type: 'button', class: 'picker-item',
+          onClick: async () => {
+            sheet.close();
+            const r = await api.addBot(code, view.room, view.members, l.value).catch(() => ({ ok: false }));
+            if (!r.ok) toast(r.reason === 'full' ? 'Стаята е пълна.' : 'Не успях да добавя бот.');
+          },
+        },
+          h('span', { class: 'picker-name', text: `${l.label} бот` }),
+          h('span', { class: 'muted', text: l.value === 'easy' ? 'Играе наслуки' : 'Мисли за хода' }),
+        ))),
+      ],
+    });
   }
 
   // Реванш: всеки натиска един бутон; домакинът стартира сам, когато всички от партидата са готови.
   function rematchState() {
     const room = view.room;
     const game = gameById(room.gameId);
-    const activeIds = new Set(activeMembers(view.members).map((m) => m.id));
+    const activeIds = new Set([...activeMembers(view.members).map((m) => m.id), ...botsOf().map((b) => b.id)]);
     const ready = readyIds();
     const lastPlayers = room.players.filter((id) => activeIds.has(id));
     const waiting = lastPlayers.filter((id) => !ready.includes(id));
@@ -486,6 +535,17 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       }
     }
 
+    // Ботове: ако аз пиша вместо тях, правя хода им след кратка пауза.
+    if (result && room.players.some(isBot) && amBotDriver()) {
+      if (!result.over) scheduleBots();
+      else if (result.game.botSecret && botRevealRound !== room.round) {
+        botRevealRound = room.round;
+        for (const id of room.players.filter(isBot)) {
+          api.store.set(`rooms/${code}/reveal/${id}`, { round: room.round, ...result.game.botSecret(room.seed, id) }).catch(() => {});
+        }
+      }
+    }
+
     // Реванш: домакинът стартира, когато всички от последната партида са готови.
     if (result?.over && room.hostId === me && autoStartFor !== room.round) {
       const { game, ready, waiting, fits } = rematchState();
@@ -508,6 +568,26 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
         : (result.current === me ? 'Твой ход.' : `Ход на ${nickOf(result.current)}.`));
     }
     tickTimer();
+  }
+
+  function scheduleBots() {
+    const room = view.room;
+    const key = `${room.round}:${result.nextIndex}`;
+    if (botKey === key) return;
+    botKey = key;
+    clearTimeout(botTimer);
+    botTimer = setTimeout(async () => {
+      const r = result;
+      const rm = view?.room;
+      if (destroyed || !r || r.over || !rm || `${rm.round}:${r.nextIndex}` !== key) return;
+      for (const id of rm.players.filter(isBot)) {
+        const level = botsOf().find((b) => b.id === id)?.level ?? 'hard';
+        const move = await botMove(r.game, r.state, id, { seed: rm.seed, index: r.nextIndex, level }).catch(() => null);
+        if (!move || !r.game.validateMove(r.state, move, id).ok) continue;
+        await api.sendBotMove(code, rm.round, id, view.log, move, r.nextIndex).catch(() => { botKey = ''; });
+        return;
+      }
+    }, 650 + Math.floor(Math.random() * 450));
   }
 
   // ---- таймер ----
@@ -572,6 +652,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     presence.leave();
     clearInterval(clock);
     clearTimeout(pendingTimer);
+    clearTimeout(botTimer);
     document.removeEventListener('keydown', onKey);
     chatFab.remove();
   };

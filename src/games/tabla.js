@@ -5,6 +5,7 @@
 // Правило: трябва да се използват колкото може повече зарове; ако може само един от два различни, по-големият.
 
 import { createRng } from '../core/rng.js';
+import { bestBy } from '../core/bots.js';
 
 const persp = (seat, idx) => (seat === 0 ? idx : 23 - idx);
 const absIdx = (seat, p) => (seat === 0 ? p : 23 - p);
@@ -160,6 +161,30 @@ export default {
     if (s.off[seat] === 15) { s.winner = seat; s.phase = 'done'; s.dice = []; return s; }
     if (!s.dice.length || !legalSteps(s).length) endTurn();
     return s;
+  },
+
+  // Хитър бот: изнася, удря, прави врати, не оставя самотни пулове.
+  botMove(s, p, rng) {
+    if (s.phase === 'roll') return { type: 'roll' };
+    const seat = s.turn;
+    const steps = legalSteps(s);
+    const noise = steps.map(() => rng.next());
+    const score = (st) => {
+      const { n, hit } = applyStep(s, seat, st);
+      let v = noise[steps.indexOf(st)];
+      if (st.to === 'off') v += 50;
+      if (hit) v += 30;
+      if (st.to !== 'off') {
+        const there = own(n, seat, st.to);
+        if (there === 2) v += 14;
+        if (there === 1) v -= 8;
+        v += (23 - persp(seat, st.to)) * 0.2;
+      }
+      if (st.from !== 'bar' && own(n, seat, st.from) === 1) v -= 8;
+      return v;
+    };
+    const pick = bestBy(steps, score);
+    return { type: 'step', from: pick.from, die: pick.die };
   },
 
   autoMove(s, p, rng) {

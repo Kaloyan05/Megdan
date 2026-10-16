@@ -1,6 +1,18 @@
 // Реверси — 8×8, 2 играчи. Без ход → редът минава автоматично; без ходове за двамата → край.
 
+import { bestBy } from '../core/bots.js';
+
 const N = 8;
+const WEIGHTS = [
+  100, -20, 10, 5, 5, 10, -20, 100,
+  -20, -50, -2, -2, -2, -2, -50, -20,
+  10, -2, 1, 1, 1, 1, -2, 10,
+  5, -2, 1, 0, 0, 1, -2, 5,
+  5, -2, 1, 0, 0, 1, -2, 5,
+  10, -2, 1, 1, 1, 1, -2, 10,
+  -20, -50, -2, -2, -2, -2, -50, -20,
+  100, -20, 10, 5, 5, 10, -20, 100,
+];
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 function flipsFor(board, idx, who) {
@@ -64,6 +76,13 @@ export default {
   },
 
   autoMove: (s, p, rng) => ({ cell: rng.pick(validCells(s.board, s.turn)) }),
+
+  // Хитър бот: ъгли, ръбове, избягва полетата до ъглите, после повече обърнати.
+  botMove(s, p, rng) {
+    const cells = validCells(s.board, s.turn);
+    const noise = cells.map(() => rng.next());
+    return { cell: bestBy(cells, (i) => WEIGHTS[i] + flipsFor(s.board, i, s.turn).length * 1.5 + noise[cells.indexOf(i)]) };
+  },
   isOver: (s) => s.over,
   winner(s) {
     const a = count(s.board, 0), b = count(s.board, 1);

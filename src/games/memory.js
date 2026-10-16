@@ -22,7 +22,7 @@ export default {
 
   init(seed, players) {
     const deck = createRng(`${seed}:memory`).shuffle([...Array(N).keys()].map((i) => i % 18));
-    return { players: players.slice(), deck, owner: Array(N).fill(null), open: [], peek: [], turn: 0, scores: players.map(() => 0) };
+    return { players: players.slice(), deck, owner: Array(N).fill(null), open: [], peek: [], turn: 0, scores: players.map(() => 0), seen: {} };
   },
 
   currentPlayer: (s) => s.players[s.turn],
@@ -35,7 +35,9 @@ export default {
     return { ok: true };
   },
 
-  applyMove(s, m) {
+  applyMove(s0, m) {
+    // seen: кои карти някога са били обърнати (публично знание, ползва го ботът).
+    const s = { ...s0, seen: { ...(s0.seen ?? {}), [m.card]: s0.deck[m.card] } };
     const open = [...s.open, m.card];
     if (open.length < 2) return { ...s, open, peek: [] };
     const [a, b] = open;
@@ -47,6 +49,23 @@ export default {
       return { ...s, owner, scores, open: [], peek: [], lastPair: s.turn };
     }
     return { ...s, open: [], peek: [a, b], turn: (s.turn + 1) % s.players.length, lastPair: null };
+  },
+
+  // Хитър бот: помни всичко обърнато.
+  botMove(s, p, rng) {
+    const seen = s.seen ?? {};
+    const free = [...Array(N).keys()].filter((i) => s.owner[i] === null && !s.open.includes(i));
+    const unseen = free.filter((i) => seen[i] === undefined);
+    if (s.open.length === 1) {
+      const sym = s.deck[s.open[0]];
+      const match = free.find((i) => seen[i] === sym);
+      if (match !== undefined) return { card: match };
+      return { card: rng.pick(unseen.length ? unseen : free) };
+    }
+    const bySym = new Map();
+    for (const i of free) if (seen[i] !== undefined) bySym.set(seen[i], [...(bySym.get(seen[i]) ?? []), i]);
+    for (const list of bySym.values()) if (list.length >= 2) return { card: list[0] };
+    return { card: rng.pick(unseen.length ? unseen : free) };
   },
 
   autoMove(s, p, rng) {

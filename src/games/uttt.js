@@ -2,6 +2,8 @@
 // Полето, в което играеш в малката дъска, определя в коя малка дъска играе противникът.
 // Ако тя е решена, противникът играе където иска. Спечели три малки в редица.
 
+import { bestBy } from '../core/bots.js';
+
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 
 function lineWinner(cells) {
@@ -61,6 +63,39 @@ export default {
   },
 
   autoMove: (s, p, rng) => ({ cell: rng.pick(validCells(s)) }),
+
+  // Хитър бот: печели игра или малка дъска, блокира, не праща противника там, където печели.
+  botMove(s, p, rng) {
+    const me = s.turn, opp = 1 - me;
+    const cells = validCells(s);
+    const canWinSmall = (cellsArr, b, who) => {
+      for (let c = 0; c < 9; c++) {
+        const i = b * 9 + c;
+        if (cellsArr[i] !== null) continue;
+        const local = cellsArr.slice(b * 9, b * 9 + 9);
+        local[c] = who;
+        if (lineWinner(local) === who) return true;
+      }
+      return false;
+    };
+    const noise = cells.map(() => rng.next());
+    const score = (i) => {
+      const b = Math.floor(i / 9), c = i % 9;
+      const next = this.applyMove(s, { cell: i }, p);
+      let v = noise[cells.indexOf(i)];
+      if (next.winner === me) return 10000;
+      if (next.small[b] === me) v += 40;
+      const local = s.cells.slice(b * 9, b * 9 + 9);
+      local[c] = opp;
+      if (lineWinner(local) === opp) v += 25;
+      if (next.forced === null) v -= 15;
+      else if (canWinSmall(next.cells, next.forced, opp)) v -= 30;
+      if (c === 4) v += 2;
+      if (b === 4) v += 3;
+      return v;
+    };
+    return { cell: bestBy(cells, score) };
+  },
   isOver: (s) => s.winner !== null,
   winner: (s) => (s.winner === null ? null : s.winner === 'draw' ? 'draw' : s.players[s.winner]),
 

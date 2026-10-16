@@ -1,5 +1,7 @@
 // Четири в редица — 7 колони × 6 реда, 2 играчи.
 
+import { bestBy } from '../core/bots.js';
+
 const COLS = 7;
 const ROWS = 6;
 const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
@@ -73,6 +75,22 @@ export default {
   },
 
   autoMove: (s, p, rng) => ({ col: rng.pick(validCols(s)) }),
+
+  // Хитър бот: печели, ако може; блокира; не подава победа; предпочита центъра.
+  botMove(s, p, rng) {
+    const me = s.turn;
+    const cols = validCols(s);
+    const after = (board, who, c) => { const r = dropRow(board, c); const b = board.slice(); b[r * COLS + c] = who; return { b, r }; };
+    const wins = (board, who, c) => { if (dropRow(board, c) === -1) return false; const { b, r } = after(board, who, c); return Boolean(findLine(b, c, r)); };
+    const win = cols.find((c) => wins(s.board, me, c));
+    if (win !== undefined) return { col: win };
+    const block = cols.find((c) => wins(s.board, 1 - me, c));
+    if (block !== undefined) return { col: block };
+    const safe = cols.filter((c) => { const { b } = after(s.board, me, c); return !wins(b, 1 - me, c); });
+    const pool = safe.length ? safe : cols;
+    const noise = pool.map(() => rng.next());
+    return { col: bestBy(pool, (c) => -Math.abs(3 - c) + noise[pool.indexOf(c)] * 0.9) };
+  },
   isOver: (s) => s.winner !== null,
   winner: (s) => s.winner,
 

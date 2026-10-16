@@ -31,7 +31,9 @@ export function renderRooms(root, { api, turns, go }) {
     } else {
       body = h('ul', { class: 'room-list' }, sorted.map((s) => {
         const members = membersCache.get(s.code) ?? [];
-        const nickOf = (id) => (id === api.me ? 'Ти' : members.find((m) => m.id === id)?.data.nick || 'Играч');
+        const bots = s.room?.bots ?? [];
+        const infoOf = (id) => bots.find((b) => b.id === id) ?? members.find((m) => m.id === id)?.data;
+        const nickOf = (id) => (id === api.me ? 'Ти' : infoOf(id)?.nick || 'Играч');
         const st = statusOf({ ...s, me: api.me }, nickOf);
         const people = (s.room?.players?.length ? s.room.players : members.filter((m) => !m.data.left).map((m) => m.id)).slice(0, 6);
         return h('li', {},
@@ -47,8 +49,7 @@ export function renderRooms(root, { api, turns, go }) {
                 h('span', { class: 'room-card-code', text: s.code }),
               ),
               h('div', { class: 'room-card-people' }, people.map((id) => {
-                const m = members.find((x) => x.id === id)?.data;
-                return avatarEl(m ?? { avatar: '🙂', color: 2 }, 'xs');
+                return avatarEl(infoOf(id) ?? { avatar: '🙂', color: 2 }, 'xs');
               })),
               h('span', { class: `chip ${st.kind}`, text: st.label }),
             ),

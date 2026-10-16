@@ -153,6 +153,14 @@ async function route() {
       if (res.ok) go(c);
       return res;
     },
+    onSolo: async (game, { timerSec, level, count }) => {
+      try {
+        const c = await api.playVsBots({ game, timerSec, profile, count, level });
+        go(c);
+      } catch (e) {
+        toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да започна игра. Опитай пак.', 4000);
+      }
+    },
     onCreate: async (gameId, timerSec = 0) => {
       try {
         const c = await api.createRoom({ gameId, timerSec, profile });

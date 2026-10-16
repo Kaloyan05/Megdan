@@ -6,7 +6,7 @@ import { GAMES, playersLabel } from '../games/index.js';
 import { normalizeCode } from '../net/api.js';
 import { openGameSheet } from './sheet.js';
 
-export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, onCreate }) {
+export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, onCreate, onSolo }) {
   const err = h('p', { class: 'error', id: 'code-error', hidden: true });
   const codeInput = h('input', {
     class: 'input code-input', id: 'code', inputMode: 'text', autocomplete: 'off', autocapitalize: 'characters',
@@ -55,7 +55,7 @@ export function renderLobby(root, { profile, myTurnCount = 0, onRooms, onJoin, o
 
   const tiles = GAMES.map((g, i) => h('button', {
     class: 'game-tile', type: 'button', '--tile-bg': `color-mix(in srgb, var(--seat-${(i % 6) + 1}) 18%, var(--surface))`,
-    onClick: () => { sound.tap(); openGameSheet(g, { onCreate }); },
+    onClick: () => { sound.tap(); openGameSheet(g, { onCreate, onSolo }); },
     'aria-label': `${g.name}, ${playersLabel(g)}. Правила и нова стая`,
   },
     h('div', { class: 'game-art' }, g.art ? g.art() : g.icon),

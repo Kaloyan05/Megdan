@@ -111,6 +111,26 @@ export default {
     return s;
   },
 
+  botMove(s, p, rng) {
+    const course = COURSES[s.hole];
+    const b = s.balls[s.turn];
+    let best = null;
+    for (let a = 0; a < 360; a += 5) {
+      const rad = (a * Math.PI) / 180;
+      const dx = r3(Math.sin(rad)), dy = r3(-Math.cos(rad));
+      for (let pw = 0.08; pw <= 1.001; pw += 0.06) {
+        const power = r3(pw);
+        const res = simulate(course, [b.x, b.y], dx, dy, power);
+        const d = res.holed ? 0 : Math.hypot(res.x - course.hole[0], res.y - course.hole[1]);
+        if (!best || d < best.d) best = { d, dx, dy, power };
+      }
+    }
+    // малка грешка, за да не е съвършен
+    const jitter = (rng.next() - 0.5) * 0.04;
+    const len = Math.hypot(best.dx + jitter, best.dy) || 1;
+    return { dx: r3((best.dx + jitter) / len), dy: r3(best.dy / len), power: best.power };
+  },
+
   autoMove(s, p, rng) {
     const course = COURSES[s.hole];
     const b = s.balls[s.turn];

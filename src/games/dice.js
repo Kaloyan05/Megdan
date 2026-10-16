@@ -106,6 +106,33 @@ export default {
     };
   },
 
+  // Хитър бот: записва добра комбинация, иначе задържа най-честата стойност (или кентата).
+  botMove(s) {
+    if (s.rolls === 0) return { type: 'roll' };
+    const sheet = s.sheets[s.turn];
+    const open = CATS.filter((c) => sheet[c.id] === undefined);
+    const best = open.reduce((b, c) => (scoreFor(c.id, s.dice) > scoreFor(b.id, s.dice) ? c : b), open[0]);
+    const special = ['poker', 'large', 'full', 'small'];
+    if (s.rolls < 3) {
+      if (special.includes(best.id) && scoreFor(best.id, s.dice) > 0) return { type: 'score', cat: best.id };
+      const c = counts(s.dice);
+      const wantRun = (sheet.large === undefined || sheet.small === undefined) && hasRun(s.dice, 3) && Math.max(...c) < 3;
+      let hold;
+      if (wantRun) {
+        const keep = new Set();
+        hold = s.dice.map((d) => { if (keep.has(d)) return false; keep.add(d); return true; });
+      } else {
+        let target = 6;
+        for (let v = 6; v >= 1; v--) if (c[v] > c[target]) target = v;
+        hold = s.dice.map((d) => d === target);
+      }
+      return { type: 'roll', hold };
+    }
+    if (scoreFor(best.id, s.dice) > 0) return { type: 'score', cat: best.id };
+    const sacrifice = ['c1', 'c2', 'poker', 'c3', 'large', 'four', 'c4', 'small', 'full', 'three', 'c5', 'c6', 'chance'];
+    return { type: 'score', cat: sacrifice.find((id) => sheet[id] === undefined) };
+  },
+
   autoMove(s) {
     if (s.rolls === 0) return { type: 'roll' };
     const open = CATS.filter((c) => s.sheets[s.turn][c.id] === undefined);

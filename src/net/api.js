@@ -10,6 +10,7 @@
 import { newSeed } from '../core/rng.js';
 import { eloDeltas, START_RATING } from '../core/elo.js';
 import { nextHost } from '../core/engine.js';
+import { isBot, makeBot } from '../core/bots.js';
 
 export const ROOM_CAP = 6;
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -53,18 +54,29 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     getStats: async (id = me) => (await store.get(`stats/${id}`)) ?? { rating: START_RATING, w: 0, l: 0, d: 0, games: {}, played: [] },
 
     // ---- стаи ----
-    async createRoom({ gameId, timerSec = 0, profile }) {
+    async createRoom({ gameId, timerSec = 0, profile, bots = [] }) {
       for (let attempt = 0; attempt < 8; attempt++) {
         const code = randomCode(rand);
         if (await store.get(roomPath(code))) continue;
         await store.set(roomPath(code), {
           code, gameId, timerSec, hostId: me, status: 'lobby', round: 0,
-          seed: null, players: [], ratings: {}, startedAt: null, createdAt: now(),
+          seed: null, players: [], ratings: {}, startedAt: null, createdAt: now(), bots,
         });
         await api.joinRoom(code, profile);
         return code;
       }
       throw new Error('no-free-code');
+    },
+
+    // Игра срещу компютъра: стая с ботове, стартира веднага.
+    async playVsBots({ game, timerSec = 0, profile, count = 1, level = 'hard' }) {
+      const bots = [];
+      for (let k = 0; k < count; k++) bots.push(makeBot(bots, level));
+      const code = await api.createRoom({ gameId: game.id, timerSec, profile, bots });
+      const room = await store.get(roomPath(code));
+      const members = await store.list(`${roomPath(code)}/members`);
+      await api.startGame(code, room, members, game);
+      return code;
     },
 
     async joinRoom(code, profile) {
@@ -139,6 +151,22 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     },
 
     setGame: (code, gameId) => store.update(roomPath(code), { gameId }),
+
+    // ---- ботове (само домакинът) ----
+    async addBot(code, room, members, level = 'hard') {
+      const bots = room.bots ?? [];
+      if (activeMembers(members).length + bots.length >= ROOM_CAP) return { ok: false, reason: 'full' };
+      await store.update(roomPath(code), { bots: [...bots, makeBot(bots, level)] });
+      return { ok: true };
+    },
+    removeBot: (code, room, id) => store.update(roomPath(code), { bots: (room.bots ?? []).filter((b) => b.id !== id) }),
+
+    // Ход на бот: всеки клиент би записал същото (ходът е детерминистичен).
+    async sendBotMove(code, round, botId, log, move, nextIndex) {
+      const prev = log.filter((x) => x.p === botId).map(({ i, t, m }) => ({ i, t, m }));
+      if (prev.some((x) => x.i === nextIndex)) return;
+      await store.set(`${roomPath(code)}/r${round}/${botId}`, { moves: [...prev, { i: nextIndex, t: now(), m: move }] });
+    },
     setTimer: (code, timerSec) => store.update(roomPath(code), { timerSec }),
 
     // Домакинът стартира: играчите са присъстващите, готови членове по ред на влизане.
@@ -146,11 +174,12 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     async startGame(code, room, members, game, chosen = null) {
       if (room.hostId !== me) return { ok: false, reason: 'not-host' };
       const ready = activeMembers(members).filter((m) => (chosen ? chosen.includes(m.id) : m.id === me || m.data.readyFor === room.round + 1));
-      const players = ready.map((m) => m.id);
+      const bots = (room.bots ?? []).filter((b) => !chosen || chosen.includes(b.id));
+      const players = [...ready.map((m) => m.id), ...bots.map((b) => b.id)];
       if (players.length < game.minPlayers) return { ok: false, reason: 'too-few' };
       if (players.length > game.maxPlayers) return { ok: false, reason: 'too-many' };
       const ratings = {};
-      for (const p of players) ratings[p] = (await api.getStats(p)).rating ?? START_RATING;
+      for (const p of players) ratings[p] = isBot(p) ? START_RATING : (await api.getStats(p)).rating ?? START_RATING;
       await store.update(roomPath(code), {
         status: 'playing', round: room.round + 1, seed: newSeed(),
         players, ratings, startedAt: now(), gameId: game.id,
@@ -230,9 +259,17 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       const myPlace = result.placements[me];
       const allTied = places.every((x) => x === places[0]);
       const outcome = allTied ? 'd' : myPlace === 1 ? 'w' : 'l';
+      // Срещу бот: не влияе на рейтинга и класацията, брои се отделно.
+      if (room.players.some(isBot)) {
+        const bot = { w: 0, l: 0, d: 0, ...(stats.bot ?? {}) };
+        bot[outcome] += 1;
+        await store.set(`stats/${me}`, { ...stats, bot, played: [...(stats.played ?? []), key].slice(-PLAYED_KEEP), updatedAt: now() });
+        return { outcome, delta: 0, vsBot: true };
+      }
       const g = { w: 0, l: 0, d: 0, ...(stats.games?.[gameId] ?? {}) };
       g[outcome] += 1;
       const next = {
+        ...stats,
         rating: (stats.rating ?? START_RATING) + (deltas[me] ?? 0),
         w: (stats.w ?? 0) + (outcome === 'w'),
         l: (stats.l ?? 0) + (outcome === 'l'),

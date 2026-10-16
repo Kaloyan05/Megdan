@@ -42,7 +42,11 @@ export function createTurnWatcher(api) {
       w.off = api.watchRoomLite(c, (v) => {
         const prev = w.summary;
         w.summary = summarize(c, v);
-        if (w.summary.gone) api.removeMyRoom(c).catch(() => {}); // стаята е изтрита
+        // Стаята е изтрита: проверка с четене от сървъра (кешът може да закъснява), после махане от списъка.
+        if (w.summary.gone && !w.checkedGone) {
+          w.checkedGone = true;
+          api.store.get(`rooms/${c}`).then((r) => { if (!r) api.removeMyRoom(c); else w.checkedGone = false; }).catch(() => { w.checkedGone = false; });
+        }
         // Нов „твой ход“ (не при първото зареждане): известие.
         if (prev && !prev.myTurn && w.summary.myTurn) turnSubs.forEach((fn) => fn(w.summary));
         emit();

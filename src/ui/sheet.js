@@ -2,6 +2,7 @@
 
 import { h } from './dom.js';
 import { GAMES, playersLabel } from '../games/index.js';
+import { BOT_LEVELS } from '../core/bots.js';
 
 let open = null;
 
@@ -46,8 +47,15 @@ function rulesList(game) {
 }
 
 // Лист за игра от лобито: правила, таймер, „Създай стая“.
-export function openGameSheet(game, { onCreate }) {
+export function openGameSheet(game, { onCreate, onSolo }) {
   let timerSec = 0;
+  let level = 'hard';
+  let count = 1;
+  const maxBots = Math.min(game.maxPlayers - 1, 3);
+  const solo = h('button', {
+    class: 'btn btn-sun', type: 'button', text: 'Играй с компютъра',
+    onClick: async (e) => { e.currentTarget.disabled = true; sheet.close(); await onSolo?.(game, { timerSec, level, count }); },
+  });
   const create = h('button', {
     class: 'btn btn-primary', type: 'button', text: 'Създай стая',
     onClick: async (e) => { e.currentTarget.disabled = true; sheet.close(); await onCreate(game.id, timerSec); },
@@ -64,8 +72,12 @@ export function openGameSheet(game, { onCreate }) {
       h('h3', { text: 'Таймер за ход' }),
       pillGroup('Таймер за ход', TIMERS.map((t) => ({ value: t.sec, label: t.label })), 0, (v) => { timerSec = v; }),
       h('p', { class: 'hint', text: 'Без таймер можете да играете бавно, през деня. Партидата се пази.' }),
+      onSolo && h('h3', { text: 'Срещу компютъра' }),
+      onSolo && pillGroup('Ниво на бота', BOT_LEVELS.map((l) => ({ value: l.value, label: l.label })), level, (v) => { level = v; }),
+      onSolo && maxBots > 1 && pillGroup('Брой ботове', [...Array(maxBots).keys()].map((k) => ({ value: k + 1, label: k ? `${k + 1} бота` : '1 бот' })), count, (v) => { count = v; }),
+      onSolo && h('p', { class: 'hint', text: 'Партиите с бот не влизат в класацията.' }),
     ],
-    actions: [create],
+    actions: [create, onSolo && solo].filter(Boolean),
   });
   create.focus();
   return sheet;

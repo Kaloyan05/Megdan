@@ -167,6 +167,19 @@ export default {
     return { type: 'shot', cell: rng.pick(free) };
   },
 
+  botSecret: (seed, id) => botSecret(seed, id),
+
+  // Бот: флотът идва от seed-а на партидата; разполага, отговаря и стреля сам.
+  async bot(s, botId, rng, level, { seed }) {
+    const seat = s.players.indexOf(botId);
+    if (s.winner !== null || seat < 0) return null;
+    const { ships, salt } = botSecret(seed, botId);
+    if (s.phase === 'place') return s.commits[seat] ? null : { type: 'place', commit: await commitOf(ships, salt) };
+    if (s.phase === 'await' && seat === 1 - s.turn) return answerFor(ships, s.pending, s.shots[s.turn]);
+    if (s.phase === 'shoot' && seat === s.turn) return { type: 'shot', cell: huntCell(s.shots[seat], rng, level) };
+    return null;
+  },
+
   // Клиентът на защитника отговаря сам, щом има изстрел към него.
   async onTurn(s, ctx) {
     const seat = s.players.indexOf(ctx.me);
@@ -352,3 +365,44 @@ async function verifyAll(s, reveals) {
 }
 
 export { verifyAll };
+
+export function botSecret(seed, botId) {
+  return { ships: randomFleet(`${seed}:${botId}`), salt: `${seed}:${botId}:salt` };
+}
+
+// Лов: довършва ранен кораб по линията; иначе стреля през поле (шахматно), далеч от потопените.
+function huntCell(shots, rng, level) {
+  const done = new Set(shots.map((x) => x.cell));
+  const sunk = new Set(shots.flatMap((x) => x.sunk ?? []));
+  const near = new Set();
+  for (const c of sunk) for (const n of neighbors(c)) near.add(n);
+  const open = (c) => c >= 0 && c < N * N && !done.has(c) && !near.has(c);
+  const free = [...Array(N * N).keys()].filter(open);
+  if (level === 'easy') return rng.pick(free.length ? free : [...Array(N * N).keys()].filter((c) => !done.has(c)));
+  const wounded = shots.filter((x) => x.hit && !sunk.has(x.cell)).map((x) => x.cell);
+  if (wounded.length) {
+    const sameRow = wounded.every((c) => Math.floor(c / N) === Math.floor(wounded[0] / N));
+    const sameCol = wounded.every((c) => c % N === wounded[0] % N);
+    const cand = [];
+    if (wounded.length > 1 && sameRow) {
+      const xs = wounded.map((c) => c % N), y = Math.floor(wounded[0] / N);
+      if (Math.min(...xs) > 0) cand.push(y * N + Math.min(...xs) - 1);
+      if (Math.max(...xs) < N - 1) cand.push(y * N + Math.max(...xs) + 1);
+    } else if (wounded.length > 1 && sameCol) {
+      const ys = wounded.map((c) => Math.floor(c / N)), x = wounded[0] % N;
+      if (Math.min(...ys) > 0) cand.push((Math.min(...ys) - 1) * N + x);
+      if (Math.max(...ys) < N - 1) cand.push((Math.max(...ys) + 1) * N + x);
+    } else {
+      for (const c of wounded) {
+        const x = c % N;
+        if (x > 0) cand.push(c - 1);
+        if (x < N - 1) cand.push(c + 1);
+        cand.push(c - N, c + N);
+      }
+    }
+    const ok = cand.filter((c) => c >= 0 && c < N * N && !done.has(c));
+    if (ok.length) return rng.pick(ok);
+  }
+  const parity = free.filter((c) => (c % N + Math.floor(c / N)) % 2 === 0);
+  return rng.pick(parity.length ? parity : free.length ? free : [...Array(N * N).keys()].filter((c) => !done.has(c)));
+}
