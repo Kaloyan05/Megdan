@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import gf, { simulate, COURSES } from '../src/games/golf.js';
+import gf, { simulate, simulate2, COURSES } from '../src/games/golf.js';
 import { replay } from '../src/core/engine.js';
 import { createRng } from '../src/core/rng.js';
 
@@ -79,4 +79,47 @@ test('цяла игра с 3 играчи, replay съвпада, класира
   assert.deepEqual(r.state, s);
   const totals = s.scores.map((x) => x.reduce((a, b) => a + b, 0));
   assert.equal(gf.placements(s)[players[totals.indexOf(Math.min(...totals))]], 1);
+});
+
+test('версия 2: старите партиди остават на версия 1, новите получават 9 писти', () => {
+  assert.equal(gf.init('s', P, { holes: 3 }).v, undefined);
+  assert.deepEqual(gf.init('s', P, { holes: 3 }).courses, [0, 1, 2]);
+  const s = gf.init('s', P, { holes: 9, _v: 2 });
+  assert.equal(s.v, 2);
+  assert.equal(s.courses.length, 9);
+});
+
+test('версия 2: вода връща топката с наказателен удар', () => {
+  let s = gf.init('s', P, { holes: 3, _v: 2 });
+  s = { ...s, hole: 2 }; // Езерото
+  const c = COURSES[s.courses[2]];
+  s.balls = s.balls.map(() => ({ x: c.tee[0], y: c.tee[1], done: false, holed: false, strokes: 0 }));
+  // право надясно-нагоре към водата
+  s = gf.applyMove(s, { dx: 0.6, dy: -0.8, power: 0.9 }, 'a');
+  assert.equal(s.last.water, true);
+  assert.equal(s.balls[0].strokes, 2);
+  assert.deepEqual([s.balls[0].x, s.balls[0].y], c.tee);
+});
+
+test('версия 2: склонът връща бавна топка назад; пътят е детерминистичен', () => {
+  const hill = COURSES[5];
+  const r = simulate2(hill, [50, 140], 0, -1, 0.35);
+  assert.ok(r.y > 98, `топката се връща под склона: ${r.y}`);
+  assert.deepEqual(simulate2(hill, [50, 140], 0.3, -0.954, 0.8), simulate2(hill, [50, 140], 0.3, -0.954, 0.8));
+});
+
+test('версия 2: цяла игра с ботове на 9 писти и replay', async () => {
+  const players = ['bot-1', 'bot-2'];
+  let s = gf.init('g2', players, { holes: 9, _v: 2 });
+  const log = [];
+  for (let k = 0; k < 400 && !gf.isOver(s); k++) {
+    const p = gf.currentPlayer(s);
+    const m = gf.autoMove(s, p, createRng(k));
+    s = gf.applyMove(s, m, p);
+    log.push({ i: k, p, t: k, m });
+  }
+  assert.ok(gf.isOver(s));
+  const r = replay(gf, { seed: 'g2', players, log, options: { holes: 9, _v: 2 } });
+  assert.equal(r.rejected.length, 0);
+  assert.deepEqual(r.state, s);
 });

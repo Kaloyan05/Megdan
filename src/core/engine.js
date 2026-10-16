@@ -24,6 +24,15 @@ export function optionsFor(game, chosen = {}) {
     const v = chosen?.[o.id];
     out[o.id] = o.choices.some((c) => c.value === v) ? v : o.default;
   }
+  // Версия на правилата, замразена при старта. Без нея (стари партиди) играта ползва версия 1.
+  if (Number.isInteger(chosen?._v)) out._v = chosen._v;
+  return out;
+}
+
+// Настройките, които се записват в стаята при старт: избраните + текущата версия на играта.
+export function freezeOptions(game, chosen = {}) {
+  const out = optionsFor(game, chosen);
+  if (game.version) out._v = game.version; else delete out._v;
   return out;
 }
 

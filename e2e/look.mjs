@@ -39,8 +39,9 @@ while (moves < MOVES && Date.now() < deadline) {
     moves++;
     if (moves === MOVES - 1) {
       // по средата на анимацията на моя ход
-      await p.waitForTimeout(120);
+      await p.waitForTimeout(Number(process.env.MIDWAIT ?? 120));
       await p.screenshot({ path: `${out}/${tag}-mid.png` });
+      await p.locator('.board-wrap').screenshot({ path: `${out}/${tag}-midboard.png` }).catch(() => {});
     }
   }
   await p.waitForTimeout(100);
@@ -54,6 +55,7 @@ for (let i = 0; i < 40; i++) {
 }
 await p.waitForTimeout(1200);
 await p.screenshot({ path: `${out}/${tag}-after.png` });
+await p.locator('.board-wrap').screenshot({ path: `${out}/${tag}-board.png` }).catch(() => {});
 console.log(`${GAME}: ${moves} хода, снимки готови${shots ? '' : ' (без снимка на бота)'}; ${before}`);
 console.log(errors.length ? `ГРЕШКИ: ${errors.join(' | ')}` : 'без грешки');
 await browser.close();

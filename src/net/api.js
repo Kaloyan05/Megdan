@@ -9,7 +9,7 @@
 
 import { newSeed } from '../core/rng.js';
 import { eloDeltas, START_RATING } from '../core/elo.js';
-import { nextHost, optionsFor } from '../core/engine.js';
+import { nextHost, optionsFor, freezeOptions } from '../core/engine.js';
 import { isBot, makeBot } from '../core/bots.js';
 
 export const ROOM_CAP = 6;
@@ -206,7 +206,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       await store.update(roomPath(code), {
         status: 'playing', round: room.round + 1, seed: newSeed(),
         players, ratings, startedAt: now(), gameId: game.id, playGameId: game.id,
-        gameOptions: optionsFor(game, room.options?.[game.id]),
+        gameOptions: freezeOptions(game, room.options?.[game.id]),
       });
       return { ok: true };
     },
