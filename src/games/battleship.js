@@ -279,6 +279,27 @@ export default {
 .bs-grid { display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:2px; width:min(100%,400px); margin-inline:auto; padding:6px;
   background:linear-gradient(160deg,#2b4f7e,#18304f); border-radius:var(--r-md); box-shadow: inset 0 2px 0 rgb(255 255 255 / .15), 0 6px 0 #10223a, 0 12px 20px rgb(0 0 0 / .25); }
 .bs-grid.small { width:min(100%,280px); }
+.bs-radar { display:grid; grid-template-columns:16px 1fr; grid-template-rows:16px auto; width:min(100%,420px); margin-inline:auto; }
+.bs-radar.small { width:min(100%,296px); }
+.bs-radar .bs-grid { width:100%; }
+.bs-top { display:grid; grid-template-columns:repeat(10,1fr); gap:2px; padding:0 6px; align-items:end; }
+.bs-left { display:grid; grid-template-rows:repeat(10,1fr); gap:2px; padding:6px 0; align-items:center; }
+.bs-top span, .bs-left span { font:700 10px/1 var(--f-body); color:var(--ink-2); text-align:center; }
+.bs-holder { position:relative; border-radius:var(--r-md); overflow:hidden; }
+/* Сонар: лъч, който обикаля, докато стреляш. */
+.bs-sweep { position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background: conic-gradient(from 0deg at 50% 50%, rgb(140 255 190 / .0) 0deg, rgb(140 255 190 / .0) 300deg, rgb(140 255 190 / .28) 352deg, rgb(200 255 220 / .55) 360deg);
+  animation: bsSweep 3.2s linear infinite; mix-blend-mode: screen; }
+@keyframes bsSweep { to { transform: rotate(1turn); } }
+.bs-holder:has(.bs-sweep)::after { content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background: radial-gradient(circle at 50% 50%, transparent 0 24%, rgb(140 255 190 / .18) 24.5% 25%, transparent 25.5% 49%, rgb(140 255 190 / .18) 49.5% 50%, transparent 50.5%); }
+/* Нос и кърма на корабите. */
+.bs-cell.h-l { border-radius:50% 3px 3px 50% / 50% 3px 3px 50%; }
+.bs-cell.h-r { border-radius:3px 50% 50% 3px / 3px 50% 50% 3px; }
+.bs-cell.h-t { border-radius:50% 50% 3px 3px / 50% 50% 3px 3px; }
+.bs-cell.h-b { border-radius:3px 3px 50% 50% / 3px 3px 50% 50%; }
+.bs-cell.h-1 { border-radius:50%; }
+.bs-cell.ship.h-h:not(.hit)::before, .bs-cell.ship.h-v:not(.hit)::before { content:''; width:28%; height:28%; border-radius:50%; background:radial-gradient(circle at 40% 35%, #d9dee6, #6b7685); box-shadow:0 0 0 1px rgb(0 0 0 / .3); }
 /* Вода: леко вълниста, кораби от стомана. */
 .bs-cell { aspect-ratio:1; border:0; padding:0; border-radius:3px; display:grid; place-items:center; position:relative; overflow:visible;
   background: radial-gradient(80% 60% at 30% 25%, rgb(255 255 255 / .35), transparent 60%), linear-gradient(160deg,#7fb6e6,#4f8fcf);
@@ -300,7 +321,7 @@ export default {
 @keyframes bsRing { from { transform:scale(.2); opacity:1; } to { transform:scale(1.4); opacity:0; } }
 @keyframes bsBoom { from { transform:scale(.2); opacity:1; } 60% { opacity:.9; } to { transform:scale(1.7); opacity:0; } }
 @keyframes bsShake { 20% { transform:translate(-2px,1px); } 40% { transform:translate(2px,-1px); } 60% { transform:translate(-1px,-1px); } 80% { transform:translate(1px,1px); } }
-@media (prefers-reduced-motion: reduce) { .bs-cell.pending, .bs-cell.fx-boom, .bs-cell.fx-sunk { animation:none; } .bs-cell::before { display:none; } }
+@media (prefers-reduced-motion: reduce) { .bs-sweep { animation:none; opacity:0; } .bs-cell.pending, .bs-cell.fx-boom, .bs-cell.fx-sunk { animation:none; } .bs-cell::before { display:none; } }
 button.bs-cell { cursor:pointer; }
 button.bs-cell:disabled { cursor:default; }
 button.bs-cell:not(:disabled):hover { background:var(--sun); }
@@ -316,27 +337,56 @@ button.bs-cell:not(:disabled):hover { background:var(--sun); }
 `,
 };
 
+// Форма на корабите: заоблен нос и кърма, според посоката.
+function hullOf(ships) {
+  const out = new Map();
+  for (const ship of ships) {
+    const cells = ship.slice().sort((a, b) => a - b);
+    if (cells.length === 1) { out.set(cells[0], 'h-1'); continue; }
+    const vertical = cells[1] - cells[0] === N;
+    out.set(cells[0], vertical ? 'h-t' : 'h-l');
+    out.set(cells.at(-1), vertical ? 'h-b' : 'h-r');
+    cells.slice(1, -1).forEach((c) => out.set(c, vertical ? 'h-v' : 'h-h'));
+  }
+  return out;
+}
+
+// Рамка като на радар: букви отгоре и числа отстрани.
+function framed(g, make, small = false, sweep = false) {
+  const box = make('div', 'bs-radar' + (small ? ' small' : ''));
+  const top = make('div', 'bs-top');
+  const left = make('div', 'bs-left');
+  for (let k = 0; k < N; k++) { top.append(make('span', null, LETTERS[k])); left.append(make('span', null, String(k + 1))); }
+  const holder = make('div', 'bs-holder');
+  holder.append(g);
+  if (sweep) holder.append(make('span', 'bs-sweep'));
+  box.append(make('span'), top, left, holder);
+  return box;
+}
+
 function gridOf(ships, incoming, make, label, small = false, pending = null, fx = null) {
   const own = new Set(ships.flat());
   const hits = new Map(incoming.map((x) => [x.cell, x.hit]));
+  const hull = hullOf(ships);
   const g = make('div', 'bs-grid' + (small ? ' small' : ''));
   g.setAttribute('role', 'group');
   g.setAttribute('aria-label', label);
   for (let i = 0; i < N * N; i++) {
     const c = make('span', 'bs-cell');
-    if (own.has(i)) c.classList.add('ship');
+    if (own.has(i)) c.classList.add('ship', hull.get(i));
     if (hits.get(i) === true) c.classList.add('hit');
     else if (hits.has(i)) c.classList.add('miss');
     if (i === pending) c.classList.add('pending');
     if (fx?.cell === i) c.classList.add(fx.cls);
     g.append(c);
   }
-  return g;
+  return framed(g, make, small);
 }
 
 function targetGrid(myShots, canShoot, onShot, make, label, pending, fx = null) {
   const known = new Map(myShots.map((x) => [x.cell, x]));
   const sunkCells = new Set(myShots.flatMap((x) => x.sunk ?? []));
+  const hull = hullOf(myShots.filter((x) => x.sunk).map((x) => x.sunk));
   const near = new Set();
   for (const c of sunkCells) for (const n of neighbors(c)) if (!sunkCells.has(n)) near.add(n);
   const g = make('div', 'bs-grid');
@@ -346,7 +396,7 @@ function targetGrid(myShots, canShoot, onShot, make, label, pending, fx = null) 
     const shot = known.get(i);
     const b = make('button', 'bs-cell');
     b.type = 'button';
-    if (sunkCells.has(i)) b.classList.add('sunk');
+    if (sunkCells.has(i)) b.classList.add('sunk', hull.get(i));
     else if (shot?.hit) b.classList.add('hit');
     else if (shot) b.classList.add('miss');
     else if (near.has(i)) b.classList.add('near');
@@ -357,7 +407,7 @@ function targetGrid(myShots, canShoot, onShot, make, label, pending, fx = null) 
     b.addEventListener('click', () => onShot(i));
     g.append(b);
   }
-  return g;
+  return framed(g, make, false, canShoot);
 }
 
 function lastText(s, ctx, seat) {

@@ -122,6 +122,8 @@ export default {
     grid.style.gridTemplateColumns = `repeat(${s.C}, var(--dot) 1fr) var(--dot)`;
     grid.style.gridTemplateRows = `repeat(${s.R}, var(--dot) 1fr) var(--dot)`;
     grid.setAttribute('aria-label', 'Дъска с точки');
+    const meSeat = s.players.indexOf(ctx.me);
+    if (meSeat >= 0) grid.style.setProperty('--me', `var(--seat-${meSeat + 1})`);
 
     const fresh = Boolean(ctx.last?.fresh);
     const sc = ctx.scratch ?? {};
@@ -190,7 +192,11 @@ export default {
 .db-line::after { content:""; position:absolute; inset:-12px; }
 .db-line.hz::after { left:4px; right:4px; }
 .db-line.vt::after { top:4px; bottom:4px; }
-.db-line:not(:disabled):hover::before, .db-line:focus-visible::before { background:rgb(27 35 51 / .45); }
+.db-line:not(:disabled):hover::before, .db-line:focus-visible::before { background:color-mix(in srgb, var(--me, #1b2333) 55%, transparent); }
+/* Дупки за класьор отляво. */
+.db { position:relative; }
+.db::before { content:''; position:absolute; left:-1px; top:12%; bottom:12%; width:9px; pointer-events:none;
+  background: radial-gradient(circle at 50% 50%, var(--bg) 0 3.5px, rgb(0 0 0 / .18) 4px, transparent 5px) 0 0 / 9px 33.3% repeat-y; }
 .db-line:disabled { cursor:default; }
 .db-line.drawn::before { background:linear-gradient(var(--stroke), color-mix(in srgb, var(--stroke) 75%, #000)); box-shadow:0 1px 1px rgb(0 0 0 / .2); }
 .db-line.last::before { outline:3px solid color-mix(in srgb, var(--sun) 70%, transparent); outline-offset:1px; }

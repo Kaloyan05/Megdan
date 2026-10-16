@@ -170,6 +170,7 @@ export default {
         const fresh = Boolean(ctx.last?.fresh);
         disc.className = 'rv-disc' + (fresh && flipped.has(i) ? ' flip' : '') + (i === s.last ? ' last' : '') + (fresh && i === s.last ? ' fx-pop' : '');
         disc.style.setProperty('--disc', `var(--seat-${v + 1})`);
+        disc.style.setProperty('--under', `var(--seat-${(1 - v) + 1})`);
         if (fresh && flipped.has(i) && s.last !== null) {
           // Обръщат се една след друга, като вълна от новия диск.
           const d = Math.max(Math.abs((i % N) - (s.last % N)), Math.abs(Math.floor(i / N) - Math.floor(s.last / N)));
@@ -179,6 +180,19 @@ export default {
         cell.append(disc);
       }
       grid.append(cell);
+    }
+    // Координати по ръба и четирите звездни точки като на истинска дъска.
+    for (let k = 0; k < N; k++) {
+      const f = document.createElement('span'); f.className = 'rv-coord file'; f.textContent = letters[k];
+      f.style.left = `calc(10px + (100% - 20px) * ${(k + 0.5) / N})`;
+      const r = document.createElement('span'); r.className = 'rv-coord rank'; r.textContent = String(k + 1);
+      r.style.top = `calc(10px + (100% - 20px) * ${(k + 0.5) / N})`;
+      grid.append(f, r);
+    }
+    for (const [x, y] of [[2, 2], [6, 2], [2, 6], [6, 6]]) {
+      const st = document.createElement('i'); st.className = 'rv-star';
+      st.style.left = `calc(10px + (100% - 20px) * ${x / N})`; st.style.top = `calc(10px + (100% - 20px) * ${y / N})`;
+      grid.append(st);
     }
     el.append(score, grid);
   },
@@ -199,11 +213,11 @@ export default {
 .rv-score { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:center; margin-bottom:10px; font-weight:700; font-variant-numeric:tabular-nums; }
 .rv-score-item { display:inline-flex; align-items:center; gap:6px; }
 .rv-note { width:100%; text-align:center; font-weight:500; color:var(--ink-2); font-size:var(--step--1); }
-.rv { display:grid; grid-template-columns:repeat(8,1fr); gap:2px; padding:8px; width:min(100%,440px); margin-inline:auto; border-radius:var(--r-lg);
+.rv { position:relative; display:grid; grid-template-columns:repeat(8,1fr); gap:2px; padding:10px; width:min(100%,440px); margin-inline:auto; border-radius:var(--r-lg);
   background:linear-gradient(160deg, color-mix(in srgb, var(--felt-edge) 85%, #fff), var(--felt-edge) 40%, color-mix(in srgb, var(--felt-edge) 75%, #000));
   box-shadow: inset 0 2px 0 rgb(255 255 255 / .2), 0 7px 0 color-mix(in srgb, var(--felt-edge) 55%, #000), 0 14px 22px rgb(0 0 0 / .25); perspective:500px; }
 .rv-cell { aspect-ratio:1; border:0; padding:0; border-radius:3px; display:grid; place-items:center; cursor:default;
-  background:radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--felt) 90%, #fff), var(--felt) 55%, color-mix(in srgb, var(--felt) 85%, #000));
+  background: var(--felt-tex), radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--felt) 90%, #fff), var(--felt) 55%, color-mix(in srgb, var(--felt) 85%, #000));
   box-shadow: inset 0 1px 2px rgb(0 0 0 / .3); }
 .rv-cell.hint { cursor:pointer; }
 .rv-cell.hint::after { content:""; width:28%; height:28%; border-radius:50%; background:rgb(255 255 255 / .35); box-shadow:inset 0 1px 2px rgb(0 0 0 / .3); }
@@ -211,7 +225,12 @@ export default {
 .rv-cell:focus-visible { outline:3px solid var(--sun); outline-offset:-3px; }
 .rv-disc { --face: radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--disc) 45%, #fff) 0 10%, var(--disc) 50%, color-mix(in srgb, var(--disc) 72%, #000) 100%);
   width:82%; height:82%; border-radius:50%; background:var(--face);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--disc) 70%, #000), 0 3px 0 color-mix(in srgb, var(--disc) 45%, #000), 0 5px 5px rgb(0 0 0 / .35); }
+  /* Отстрани личи другият цвят, както при истинските дискове. */
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--disc) 70%, #000), 0 2px 0 color-mix(in srgb, var(--disc) 45%, #000), 0 4px 0 var(--under, #000), 0 6px 5px rgb(0 0 0 / .35); }
+.rv-coord { position:absolute; font:700 9px/1 var(--f-body); color:rgb(255 255 255 / .75); pointer-events:none; }
+.rv-coord.file { top:1px; translate:-50% 0; }
+.rv-coord.rank { left:2px; translate:0 -50%; }
+.rv-star { position:absolute; width:7px; height:7px; margin:-3.5px 0 0 -3.5px; border-radius:50%; background:#13361f; box-shadow:0 1px 0 rgb(255 255 255 / .2); pointer-events:none; z-index:1; }
 .rv-disc.last { outline:3px solid var(--sun); outline-offset:1px; }
 /* Обръщане: първата половина е в стария цвят, втората в новия. */
 .rv-disc.flip { animation:rvflip .5s cubic-bezier(.4,0,.2,1) both; }

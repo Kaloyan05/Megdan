@@ -168,7 +168,11 @@ export default {
       }
       big.append(sb);
     }
-    el.append(big);
+    // Поставка с тебешири и гъба под дъската.
+    const tray = document.createElement('div');
+    tray.className = 'ut-tray';
+    tray.innerHTML = '<i class="chalk c0"></i><i class="chalk c1"></i><i class="chalk c2"></i><b class="sponge"></b>';
+    el.append(big, tray);
   },
 
   art() {
@@ -188,7 +192,7 @@ export default {
   css: `
 /* Черна дъска с тебешир: дървена рамка, бели линии, цветни щрихи. */
 .ut { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; width:min(100%,440px); margin-inline:auto; padding:12px; border-radius:14px;
-  background: radial-gradient(120% 100% at 30% 20%, #3c5a4c, #2a4136 60%, #213429);
+  background: var(--felt-tex), radial-gradient(60% 40% at 70% 70%, rgb(255 255 255 / .05), transparent), radial-gradient(120% 100% at 30% 20%, #3c5a4c, #2a4136 60%, #213429);
   box-shadow: inset 0 0 0 7px #8a5a2c, inset 0 0 0 9px #5a3214, inset 0 0 30px rgb(0 0 0 / .45), 0 7px 0 #3a200c, 0 14px 22px rgb(0 0 0 / .25); }
 .ut-small { position:relative; min-width:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; padding:6px; transition: background-color .3s; }
 .ut-small:nth-child(3n+1), .ut-small:nth-child(3n+2) { border-right: 3px solid rgb(240 240 230 / .75); }
@@ -211,6 +215,13 @@ export default {
 .ut-over path { stroke-width:2.2; }
 .ut-over.draw path { animation-duration:.5s; }
 .ut-over.draw-txt { display:grid; place-items:center; font:800 clamp(2.4rem,14vw,4.4rem)/1 var(--f-display); color:rgb(240 240 230 / .8); width:auto; height:auto; inset:0; }
+.ut-tray { position:relative; width:min(92%,404px); height:16px; margin:-4px auto 0; border-radius:0 0 8px 8px;
+  background: var(--wood), linear-gradient(180deg,#8a5a2c,#5a3214); box-shadow: 0 6px 10px rgb(0 0 0 / .25); }
+.ut-tray .chalk { position:absolute; top:3px; height:7px; border-radius:3px; box-shadow:0 1px 1px rgb(0 0 0 / .3); }
+.ut-tray .c0 { left:12%; width:42px; background:linear-gradient(#fff,#e2e2dc); transform:rotate(-3deg); }
+.ut-tray .c1 { left:30%; width:30px; background:linear-gradient(#ffd0d0,#e59a9a); }
+.ut-tray .c2 { left:42%; width:24px; background:linear-gradient(#cfe0ff,#93b2e8); transform:rotate(4deg); }
+.ut-tray .sponge { position:absolute; right:10%; top:-4px; width:54px; height:14px; border-radius:4px; background:linear-gradient(#e9c46a 0 45%, #3b3b3b 45%); box-shadow:0 2px 2px rgb(0 0 0 / .35); }
 @media (prefers-reduced-motion: reduce) { .ut-small.open { animation:none; } .ut-mark.draw path, .ut-over.draw path { animation:none; stroke-dashoffset:0; } }
 .ut-art { display:grid; grid-template-columns:repeat(3,24px); gap:3px; padding:5px; background:var(--ink); border-radius:10px; }
 .ut-art span { height:24px; background:var(--surface); border-radius:4px; display:grid; place-items:center; font:800 .9rem/1 var(--f-display); }
