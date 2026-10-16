@@ -1,0 +1,17 @@
+rules_version = '2';
+// Мегдан: пише и чете само влязъл (анонимно) потребител. Профила и статистиката си ги пише само собственикът.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /profiles/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /stats/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /rooms/{rest=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
