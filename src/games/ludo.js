@@ -60,19 +60,23 @@ export default {
   icon: '🎯',
   blurb: 'Хвърли, тичай около дъската и чупи фигурите на другите.',
   rules: [
-    'Всеки има 4 фигури в базата. С шестица изкарваш фигура на старта.',
+    'Всеки има 4 фигури в базата (или 2-3 при бърза игра). С шестица изкарваш фигура на старта.',
     'Хвърляш зар и местиш една фигура толкова полета. Шестица дава още хвърляне.',
     'Ако нямаш фигура на пътя, имаш 3 опита да хвърлиш шестица.',
     'Стъпиш ли върху чужда фигура, тя се връща в базата. Не се сърди!',
-    'Печели първият, който прибере и четирите фигури в къщичката.',
+    'Печели първият, който прибере всичките си фигури в къщичката.',
   ],
   minPlayers: 2,
   maxPlayers: 4,
   moveSound: 'tap',
 
-  init: (seed, players) => ({
+  options: [
+    { id: 'pieces', label: 'Фигури', default: 4, choices: [{ value: 2, label: '2 (бърза игра)' }, { value: 3, label: '3' }, { value: 4, label: '4' }] },
+  ],
+
+  init: (seed, players, opts = {}) => ({
     seed: String(seed), players: players.slice(), corners: cornersFor(players.length),
-    pieces: players.map(() => [-1, -1, -1, -1]), turn: 0, phase: 'roll', die: null, tries: 3, rollNo: 0,
+    pieces: players.map(() => Array(opts.pieces ?? 4).fill(-1)), turn: 0, phase: 'roll', die: null, tries: 3, rollNo: 0,
     winner: null, last: null,
   }),
 

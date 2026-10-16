@@ -2,8 +2,7 @@
 
 import { createRng } from '../core/rng.js';
 
-export const SYMBOLS = ['🍎', '🍋', '🍇', '🍉', '🍒', '🥝', '🍑', '🥕', '🌽', '🍄', '🐟', '🐞', '🦋', '🌻', '⚽', '🎈', '🎲', '⭐'];
-const N = 36;
+export const SYMBOLS = ['🍎', '🍋', '🍇', '🍉', '🍒', '🥝', '🍑', '🥕', '🌽', '🍄', '🐟', '🐞', '🦋', '🌻', '⚽', '🎈', '🎲', '⭐', '🚲', '🎸', '🐢', '🌙', '🍕', '🎁'];
 
 export default {
   id: 'memory',
@@ -20,9 +19,14 @@ export default {
   maxPlayers: 4,
   moveSound: 'flip',
 
-  init(seed, players) {
-    const deck = createRng(`${seed}:memory`).shuffle([...Array(N).keys()].map((i) => i % 18));
-    return { players: players.slice(), deck, owner: Array(N).fill(null), open: [], peek: [], turn: 0, scores: players.map(() => 0), seen: {} };
+  options: [
+    { id: 'pairs', label: 'Двойки', default: 18, choices: [{ value: 12, label: '12' }, { value: 18, label: '18' }, { value: 24, label: '24' }] },
+  ],
+
+  init(seed, players, opts = {}) {
+    const pairs = opts.pairs ?? 18;
+    const deck = createRng(`${seed}:memory`).shuffle([...Array(pairs * 2).keys()].map((i) => i % pairs));
+    return { players: players.slice(), deck, owner: Array(pairs * 2).fill(null), open: [], peek: [], turn: 0, scores: players.map(() => 0), seen: {} };
   },
 
   currentPlayer: (s) => s.players[s.turn],
@@ -30,7 +34,7 @@ export default {
   validateMove(s, m, p) {
     if (s.owner.every((o) => o !== null)) return { ok: false, reason: 'over' };
     if (p !== s.players[s.turn]) return { ok: false, reason: 'not-your-turn' };
-    if (!Number.isInteger(m?.card) || m.card < 0 || m.card >= N) return { ok: false, reason: 'bad-card' };
+    if (!Number.isInteger(m?.card) || m.card < 0 || m.card >= s.deck.length) return { ok: false, reason: 'bad-card' };
     if (s.owner[m.card] !== null || s.open.includes(m.card)) return { ok: false, reason: 'card-open' };
     return { ok: true };
   },
@@ -56,7 +60,7 @@ export default {
     // Средният бот помни около половината обърнати карти, трудният помни всичко.
     const all = s.seen ?? {};
     const seen = level === 'hard' ? all : Object.fromEntries(Object.entries(all).filter(([i]) => createRng(`${i}:${s.scores.join()}`).next() < 0.5));
-    const free = [...Array(N).keys()].filter((i) => s.owner[i] === null && !s.open.includes(i));
+    const free = [...Array(s.deck.length).keys()].filter((i) => s.owner[i] === null && !s.open.includes(i));
     const unseen = free.filter((i) => seen[i] === undefined);
     if (s.open.length === 1) {
       const sym = s.deck[s.open[0]];
@@ -71,7 +75,7 @@ export default {
   },
 
   autoMove(s, p, rng) {
-    const free = [...Array(N).keys()].filter((i) => s.owner[i] === null && !s.open.includes(i));
+    const free = [...Array(s.deck.length).keys()].filter((i) => s.owner[i] === null && !s.open.includes(i));
     return { card: rng.pick(free) };
   },
 
@@ -106,7 +110,8 @@ export default {
     grid.className = 'mm';
     grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', 'Карти');
-    for (let i = 0; i < N; i++) {
+    grid.style.setProperty('--mm-cols', s.deck.length > 36 ? 8 : 6);
+    for (let i = 0; i < s.deck.length; i++) {
       const owned = s.owner[i];
       const shown = owned !== null || s.open.includes(i) || s.peek.includes(i);
       const b = document.createElement('button');
@@ -138,7 +143,7 @@ export default {
   },
 
   css: `
-.mm { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; width:min(100%,440px); margin-inline:auto; }
+.mm { display:grid; grid-template-columns:repeat(var(--mm-cols, 6),minmax(0,1fr)); gap:6px; width:min(100%,440px); margin-inline:auto; }
 .mm-card { aspect-ratio:3/4; border-radius:10px; border:2px solid var(--ink); padding:0; cursor:pointer;
   background:repeating-linear-gradient(45deg, var(--accent) 0 5px, color-mix(in srgb, var(--accent) 75%, #fff) 5px 8px);
   box-shadow:0 3px 0 var(--ink); display:grid; place-items:center; transition:transform .15s ease; }

@@ -3,6 +3,21 @@
 import { h } from './dom.js';
 import { GAMES, playersLabel } from '../games/index.js';
 import { BOT_LEVELS } from '../core/bots.js';
+import { optionsFor } from '../core/engine.js';
+
+// Вариации на правилата като групи бутони. onChange получава целия обект.
+export function optionsControls(game, current, onChange) {
+  const opts = { ...optionsFor(game, current) };
+  return (game.options ?? []).map((o) => h('div', { class: 'field' },
+    h('span', { class: 'field-label', text: o.label }),
+    pillGroup(o.label, o.choices, opts[o.id], (v) => { opts[o.id] = v; onChange({ ...opts }); }),
+  ));
+}
+
+export function optionsSummary(game, current) {
+  const opts = optionsFor(game, current);
+  return (game.options ?? []).map((o) => `${o.label}: ${o.choices.find((c) => c.value === opts[o.id])?.label ?? ''}`).join('; ');
+}
 
 let open = null;
 
@@ -51,14 +66,15 @@ export function openGameSheet(game, { onCreate, onSolo }) {
   let timerSec = 0;
   let level = 'medium';
   let count = 1;
+  let options = optionsFor(game, {});
   const maxBots = Math.min(game.maxPlayers - 1, 3);
   const solo = h('button', {
     class: 'btn btn-sun', type: 'button', text: 'Играй с компютъра',
-    onClick: async (e) => { e.currentTarget.disabled = true; sheet.close(); await onSolo?.(game, { timerSec, level, count }); },
+    onClick: async (e) => { e.currentTarget.disabled = true; sheet.close(); await onSolo?.(game, { timerSec, level, count, options }); },
   });
   const create = h('button', {
     class: 'btn btn-primary', type: 'button', text: 'Създай стая',
-    onClick: async (e) => { e.currentTarget.disabled = true; sheet.close(); await onCreate(game.id, timerSec); },
+    onClick: async (e) => { e.currentTarget.disabled = true; sheet.close(); await onCreate(game.id, timerSec, options); },
   });
   const sheet = openSheet({
     title: game.name,
@@ -69,6 +85,8 @@ export function openGameSheet(game, { onCreate, onSolo }) {
       ),
       h('h3', { text: 'Как се играе' }),
       rulesList(game),
+      game.options?.length && h('h3', { text: 'Правила' }),
+      ...(game.options?.length ? optionsControls(game, options, (o) => { options = o; }) : []),
       h('h3', { text: 'Таймер за ход' }),
       pillGroup('Таймер за ход', TIMERS.map((t) => ({ value: t.sec, label: t.label })), 0, (v) => { timerSec = v; }),
       h('p', { class: 'hint', text: 'Без таймер можете да играете бавно, през деня. Партидата се пази.' }),

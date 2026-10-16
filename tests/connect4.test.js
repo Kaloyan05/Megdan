@@ -65,3 +65,26 @@ test('автоматичният ход е валиден', async () => {
     assert.ok(c4.validateMove(s, m, 'a').ok);
   }
 });
+
+test('по-голяма дъска 9×7: размер, ход и бот', async () => {
+  const { createRng } = await import('../src/core/rng.js');
+  const s = c4.init('s', P, { size: '9x7' });
+  assert.equal(s.board.length, 63);
+  assert.equal(s.cols, 9);
+  assert.ok(c4.validateMove(s, { col: 8 }, 'a').ok);
+  assert.equal(c4.validateMove(s, { col: 9 }, 'a').reason, 'bad-column');
+  let st = s;
+  const log = [];
+  for (let k = 0; k < 63 && !c4.isOver(st); k++) {
+    const p = c4.currentPlayer(st);
+    const m = c4.botMove(st, p, createRng(k), k % 2 ? 'hard' : 'medium');
+    assert.ok(c4.validateMove(st, m, p).ok);
+    st = c4.applyMove(st, m, p);
+    log.push({ i: k, p, t: k, m });
+  }
+  const r = replay(c4, { seed: 's', players: P, log, options: { size: '9x7' } });
+  assert.deepEqual(r.state, st);
+  // смесване с класическа дъска в същия процес не обърква размера
+  const classic = c4.applyMove(c4.init('s', P), { col: 6 }, 'a');
+  assert.equal(classic.board[6], 0);
+});

@@ -9,7 +9,7 @@
 
 import { newSeed } from '../core/rng.js';
 import { eloDeltas, START_RATING } from '../core/elo.js';
-import { nextHost } from '../core/engine.js';
+import { nextHost, optionsFor } from '../core/engine.js';
 import { isBot, makeBot } from '../core/bots.js';
 
 export const ROOM_CAP = 6;
@@ -54,13 +54,14 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     getStats: async (id = me) => (await store.get(`stats/${id}`)) ?? { rating: START_RATING, w: 0, l: 0, d: 0, games: {}, played: [] },
 
     // ---- стаи ----
-    async createRoom({ gameId, timerSec = 0, profile, bots = [] }) {
+    async createRoom({ gameId, timerSec = 0, profile, bots = [], options = {} }) {
       for (let attempt = 0; attempt < 8; attempt++) {
         const code = randomCode(rand);
         if (await store.get(roomPath(code))) continue;
         await store.set(roomPath(code), {
           code, gameId, timerSec, hostId: me, status: 'lobby', round: 0,
           seed: null, players: [], ratings: {}, startedAt: null, createdAt: now(), bots,
+          options: { [gameId]: options },
         });
         await api.joinRoom(code, profile);
         return code;
@@ -69,10 +70,10 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
     },
 
     // Игра срещу компютъра: стая с ботове, стартира веднага.
-    async playVsBots({ game, timerSec = 0, profile, count = 1, level = 'medium' }) {
+    async playVsBots({ game, timerSec = 0, profile, count = 1, level = 'medium', options = {} }) {
       const bots = [];
       for (let k = 0; k < count; k++) bots.push(makeBot(bots, level));
-      const code = await api.createRoom({ gameId: game.id, timerSec, profile, bots });
+      const code = await api.createRoom({ gameId: game.id, timerSec, profile, bots, options });
       const room = await store.get(roomPath(code));
       const members = await store.list(`${roomPath(code)}/members`);
       await api.startGame(code, room, members, game);
@@ -168,6 +169,8 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       await store.set(`${roomPath(code)}/r${round}/${botId}`, { moves: [...prev, { i: nextIndex, t: now(), m: move }] });
     },
     setTimer: (code, timerSec) => store.update(roomPath(code), { timerSec }),
+    // Вариации на правилата: пазят се по игра, важат от следващия старт.
+    setOptions: (code, room, gameId, opts) => store.update(roomPath(code), { options: { ...(room.options ?? {}), [gameId]: opts } }),
 
     // Домакинът стартира: играчите са присъстващите, готови членове по ред на влизане.
     // players: изричен списък (реванш); иначе домакинът + готовите.
@@ -183,6 +186,7 @@ export function createApi(store, { now = () => Date.now(), rand = Math.random } 
       await store.update(roomPath(code), {
         status: 'playing', round: room.round + 1, seed: newSeed(),
         players, ratings, startedAt: now(), gameId: game.id,
+        gameOptions: optionsFor(game, room.options?.[game.id]),
       });
       return { ok: true };
     },

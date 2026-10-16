@@ -8,6 +8,7 @@ const { chromium } = require('playwright');
 const BASE = process.env.BASE ?? 'http://localhost:8080/';
 const out = process.argv[2] ?? '.';
 const only = process.env.ONLY?.split(',');
+const PICK = JSON.parse(process.env.PICK ?? '{}');
 const errors = [];
 const browser = await chromium.launch();
 
@@ -21,6 +22,8 @@ async function solo(name, tag, level) {
   await p.getByRole('button', { name: 'Към мегдана' }).click();
   await p.getByRole('button', { name: new RegExp(name) }).first().click();
   if (level) await p.locator('.pills[aria-label="Ниво на бота"] .pill', { hasText: level }).click();
+  for (const [group, label] of PICK[tag] ?? []) await p.locator(`.pills[aria-label="${group}"] .pill`, { hasText: label }).click();
+  if (PICK[tag]) await p.screenshot({ path: `${out}/sheet-${tag}.png` });
   await p.getByRole('button', { name: 'Играй с компютъра' }).click();
   await p.locator('.code-chip-code').waitFor();
   if (tag === 'battleship') {

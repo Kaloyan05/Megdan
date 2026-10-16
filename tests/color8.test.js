@@ -139,3 +139,51 @@ test('цяла партида с 6 играчи и автоматични ход
   const all = [...r.state.hands.flat(), ...r.state.draw, ...r.state.discard];
   assert.equal(new Set(all).size, 68, 'нито една карта не се губи');
 });
+
+test('настройки: 5 карти в ръка', () => {
+  const s = c8.init('h5', P3, { hand: 5, stack: false });
+  assert.ok(s.hands.every((h) => h.length === 5));
+});
+
+test('+2 върху +2: дългът се трупа и следващият тегли всичко', () => {
+  const s0 = c8.init('st', P3, { hand: 7, stack: true });
+  const s = { ...s0, hands: [[id(0, 14), id(0, 4)], [id(1, 15), id(1, 3)], [id(2, 3), id(2, 4)]], discard: [id(0, 0)], color: 0, draw: [...Array(20).keys()].map((k) => id(3, k % 8)) };
+  let r = c8.applyMove(s, { type: 'play', card: id(0, 14), call: true }, 'a');
+  assert.equal(r.owed, 2);
+  assert.equal(r.turn, 1);
+  assert.equal(c8.validateMove(r, { type: 'play', card: id(1, 3) }, 'b').reason, 'must-stack');
+  assert.equal(c8.validateMove(r, { type: 'pass' }, 'b').reason, 'draw-first');
+  r = c8.applyMove(r, { type: 'play', card: id(1, 15), call: true }, 'b');
+  assert.equal(r.owed, 4);
+  assert.equal(r.turn, 2);
+  r = c8.applyMove(r, { type: 'draw' }, 'c');
+  assert.equal(r.hands[2].length, 6);
+  assert.equal(r.owed, 0);
+  assert.equal(r.turn, 0);
+});
+
+test('без трупане: +2 тегли веднага, както преди', () => {
+  const s0 = c8.init('st', P3, { hand: 7, stack: false });
+  const s = { ...s0, hands: [[id(0, 14), id(0, 4)], [id(1, 3)], [id(2, 3)]], discard: [id(0, 0)], color: 0, draw: [...Array(10).keys()].map((k) => id(3, k % 8)) };
+  const r = c8.applyMove(s, { type: 'play', card: id(0, 14), call: true }, 'a');
+  assert.equal(r.owed, 0);
+  assert.equal(r.hands[1].length, 3);
+  assert.equal(r.turn, 2);
+});
+
+test('партида с трупане до край през replay', () => {
+  const P = ['a', 'b', 'c', 'd'];
+  let s = c8.init('stk', P, { hand: 7, stack: true });
+  const log = [];
+  for (let k = 0; k < 3000 && !c8.isOver(s); k++) {
+    const p = c8.currentPlayer(s);
+    const m = c8.autoMove(s, p, createRng(k));
+    assert.ok(c8.validateMove(s, m, p).ok, JSON.stringify(m));
+    s = c8.applyMove(s, m, p);
+    log.push({ i: k, p, t: k, m });
+  }
+  assert.ok(c8.isOver(s));
+  const r = replay(c8, { seed: 'stk', players: P, log, options: { stack: true } });
+  assert.equal(r.rejected.length, 0);
+  assert.deepEqual(r.state, s);
+});

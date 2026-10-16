@@ -7,7 +7,7 @@ import { gameById, playersLabel } from '../games/index.js';
 import { replay } from '../core/engine.js';
 import { activeMembers } from '../net/api.js';
 import { ARTIFACT_URL } from '../config.js';
-import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet } from './sheet.js';
+import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet, optionsControls, optionsSummary } from './sheet.js';
 import { isBot, botMove, BOT_LEVELS } from '../core/bots.js';
 
 const REACTIONS = ['👍', '😂', '😮', '😡', '🎉', '❤️'];
@@ -196,7 +196,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     return {
       game,
       ...replay(game, {
-        seed: room.seed, players: room.players, log: view.log,
+        seed: room.seed, players: room.players, log: view.log, options: room.gameOptions,
         startedAt: room.startedAt, turnLimitMs: (room.timerSec || 0) * 1000,
       }),
     };
@@ -299,6 +299,9 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
             (v) => api.setTimer(code, v).catch(() => {})),
         )
         : h('p', { class: 'muted', text: `Таймер: ${TIMERS.find((t) => t.sec === (room.timerSec || 0))?.label ?? 'без'}.` }),
+      game.options?.length && (amHost
+        ? optionsControls(game, room.options?.[game.id], (o) => api.setOptions(code, room, game.id, o).catch(() => toast('Не успях да сменя правилата.')))
+        : h('p', { class: 'muted', text: `Правила: ${optionsSummary(game, room.options?.[game.id])}.` })),
       h('p', { class: 'hint', text: hint }),
       h2hRow(game.id),
       h('div', { class: 'actions' },
@@ -376,7 +379,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
           onClick: () => openGamePicker(room.gameId, (id) => api.setGame(code, id).catch(() => {})),
         }),
       ),
-      h('p', { class: 'hint', text: `${hint} Следваща игра: ${game.name}.` }),
+      h('p', { class: 'hint', text: `${hint} Следваща игра: ${game.name}.${game.options?.length ? ` Правила: ${optionsSummary(game, room.options?.[game.id])}.` : ''}` }),
       h2hRow(game.id),
     );
   }
@@ -581,7 +584,7 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
 
     renderSeats();
     const key = JSON.stringify([
-      room.status, room.round, room.gameId, room.timerSec, room.hostId, acc, result?.over, pending, resignArmed,
+      room.status, room.round, room.gameId, room.timerSec, room.hostId, acc, result?.over, pending, resignArmed, JSON.stringify(room.options ?? {}),
       secret.loaded, Object.keys(reveals).length,
       activeMembers(view.members).map((m) => [m.id, m.data.readyFor, m.data.nick, m.data.avatar]),
     ]);

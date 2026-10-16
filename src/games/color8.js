@@ -17,6 +17,12 @@ export const card = (id) => (id >= 64 ? { id, color: -1, kind: 'w4' } : { id, co
 const isWild = (id) => { const k = card(id).kind; return k === '8' || k === 'w4'; };
 const top = (s) => s.discard[s.discard.length - 1];
 
+// Може ли картата сега: при натрупано „+“ само +2/+4 върху него.
+export function canPlayNow(s, id) {
+  if (s.owed) return (card(id).kind === 'plus2' || card(id).kind === 'w4') && canPlay(s, id);
+  return canPlay(s, id);
+}
+
 export function canPlay(s, id) {
   if (isWild(id)) return true;
   const c = card(id), t = card(top(s));
@@ -54,16 +60,21 @@ export default {
   name: 'Цветна осмица',
   icon: '🃏',
   blurb: 'Карти с цветове, жокери и +4. Не забравяй „Последна карта!“.',
-  rules: ["Всеки започва със 7 карти. Играеш карта със същия цвят или стойност като горната.", "Осмицата е жокер: играеш я винаги и избираш новия цвят. Жокерът +4 също сменя цвета, а следващият тегли 4 и пропуска.", "„Пропусни“ прескача следващия, „Обратно“ обръща посоката, „+2“ кара следващия да тегли две и да пропусне.", "Нямаш ход? Тегли карта. Ако става, можеш да я изиграеш веднага.", "Преди да изиграеш предпоследната си карта, натисни „Последна карта!“. Иначе теглиш 2.", "Печели първият, който остане без карти."],
+  rules: ["Всеки започва със 7 карти (или 5, 9 по избор). Играеш карта със същия цвят или стойност като горната.", "Осмицата е жокер: играеш я винаги и избираш новия цвят. Жокерът +4 също сменя цвета, а следващият тегли 4 и пропуска.", "„Пропусни“ прескача следващия, „Обратно“ обръща посоката, „+2“ кара следващия да тегли две и да пропусне. С правилото „+2 върху +2“ той може да отговори със свое +2 или +4 и дългът се трупа.", "Нямаш ход? Тегли карта. Ако става, можеш да я изиграеш веднага.", "Преди да изиграеш предпоследната си карта, натисни „Последна карта!“. Иначе теглиш 2.", "Печели първият, който остане без карти."],
   minPlayers: 2,
   maxPlayers: 6,
   moveSound: 'card',
+  options: [
+    { id: 'hand', label: 'Карти в ръка', default: 7, choices: [{ value: 5, label: '5' }, { value: 7, label: '7' }, { value: 9, label: '9' }] },
+    { id: 'stack', label: '+2 върху +2', default: false, choices: [{ value: false, label: 'Не' }, { value: true, label: 'Да, трупат се' }] },
+  ],
 
-  init(seed, players) {
+  init(seed, players, opts = {}) {
+    const handSize = opts.hand ?? 7;
     const rng = createRng(`${seed}:deck`);
     const deck = rng.shuffle([...Array(DECK_SIZE).keys()]);
     const hands = players.map(() => []);
-    for (let k = 0; k < 7; k++) for (let p = 0; p < players.length; p++) hands[p].push(deck.pop());
+    for (let k = 0; k < handSize; k++) for (let p = 0; p < players.length; p++) hands[p].push(deck.pop());
     // Първата карта е число (не осмица и не специална).
     let i = deck.length - 1;
     while (!/^[1-79]$/.test(card(deck[i]).kind)) i -= 1;
@@ -71,6 +82,7 @@ export default {
     return {
       seed: String(seed), players: players.slice(), hands, draw: deck, discard: [first],
       color: card(first).color, dir: 1, turn: 0, pending: null, winner: null, reshuffles: 0,
+      stack: Boolean(opts.stack), owed: 0,
       last: null, // { seat, kind, drew } за съобщението над масата
     };
   },
@@ -84,16 +96,17 @@ export default {
     if (m?.type === 'play') {
       if (!hand.includes(m.card)) return { ok: false, reason: 'not-in-hand' };
       if (s.pending !== null && m.card !== s.pending) return { ok: false, reason: 'only-drawn' };
-      if (!canPlay(s, m.card)) return { ok: false, reason: 'no-match' };
+      if (!canPlayNow(s, m.card)) return { ok: false, reason: s.owed ? 'must-stack' : 'no-match' };
       if (isWild(m.card) && !(Number.isInteger(m.color) && m.color >= 0 && m.color < 4)) return { ok: false, reason: 'pick-color' };
       return { ok: true };
     }
     if (m?.type === 'draw') {
       if (s.pending !== null) return { ok: false, reason: 'already-drew' };
-      if (!canDrawAny(s)) return { ok: false, reason: 'deck-empty' };
+      if (!s.owed && !canDrawAny(s)) return { ok: false, reason: 'deck-empty' };
       return { ok: true };
     }
     if (m?.type === 'pass') {
+      if (s.owed) return { ok: false, reason: 'draw-first' };
       if (s.pending !== null) return { ok: true };
       if (!canDrawAny(s) && !hand.some((id) => canPlay(s, id))) return { ok: true };
       return { ok: false, reason: 'draw-first' };
@@ -104,6 +117,12 @@ export default {
   applyMove(s0, m) {
     const s = clone(s0);
     const seat = s.turn;
+    if (m.type === 'draw' && s.owed) {
+      s.last = { seat, kind: 'owed', drew: drawCards(s, seat, s.owed).length };
+      s.owed = 0;
+      s.turn = nextSeat(s, seat);
+      return s;
+    }
     if (m.type === 'draw') {
       const [id] = drawCards(s, seat, 1);
       s.last = { seat, kind: 'draw' };
@@ -139,6 +158,12 @@ export default {
     } else if (c.kind === 'skip') {
       s.last.target = nextSeat(s, seat);
       s.turn = nextSeat(s, seat, 2);
+    } else if ((c.kind === 'plus2' || c.kind === 'w4') && s.stack) {
+      // Трупане: следващият може да сложи свое +2/+4 или да тегли всичко.
+      s.owed += c.kind === 'w4' ? 4 : 2;
+      s.last.target = nextSeat(s, seat);
+      s.last.owed = s.owed;
+      s.turn = nextSeat(s, seat);
     } else if (c.kind === 'plus2' || c.kind === 'w4') {
       const victim = nextSeat(s, seat);
       s.last.target = victim;
@@ -153,6 +178,10 @@ export default {
   autoMove(s, p, rng) {
     const hand = s.hands[s.turn];
     if (s.pending !== null) return canPlay(s, s.pending) ? this.playWithColor(s, s.pending) : { type: 'pass' };
+    if (s.owed) {
+      const stackers = hand.filter((id) => canPlayNow(s, id));
+      return stackers.length ? this.playWithColor(s, stackers[0]) : { type: 'draw' };
+    }
     const playable = hand.filter((id) => canPlay(s, id));
     const plain = playable.filter((id) => !isWild(id));
     if (plain.length) return { type: 'play', card: rng.pick(plain), call: hand.length === 2 };
@@ -199,9 +228,9 @@ export default {
     const table = make('div', 'c8-table');
     const drawBtn = make('button', 'c8-pile');
     drawBtn.type = 'button';
-    drawBtn.disabled = !myTurn || s.pending !== null || !canDrawAny(s);
-    drawBtn.setAttribute('aria-label', `Тегли карта. В тестето има ${s.draw.length}`);
-    drawBtn.append(make('span', 'c8-back'), make('span', 'c8-pile-n', String(s.draw.length)));
+    drawBtn.disabled = !myTurn || s.pending !== null || (!s.owed && !canDrawAny(s));
+    drawBtn.setAttribute('aria-label', s.owed ? `Тегли ${s.owed} карти` : `Тегли карта. В тестето има ${s.draw.length}`);
+    drawBtn.append(make('span', 'c8-back'), make('span', 'c8-pile-n', s.owed ? `+${s.owed}` : String(s.draw.length)));
     drawBtn.addEventListener('click', () => ctx.onMove({ type: 'draw' }));
     const topCard = cardEl(top(s), make);
     topCard.classList.add('c8-top');
@@ -222,7 +251,7 @@ export default {
       hand.setAttribute('aria-label', 'Твоите карти');
       const sorted = s.hands[meSeat].slice().sort((a, b) => card(a).color - card(b).color || KINDS.indexOf(card(a).kind) - KINDS.indexOf(card(b).kind));
       for (const id of sorted) {
-        const playable = myTurn && (s.pending === null || s.pending === id) && canPlay(s, id);
+        const playable = myTurn && (s.pending === null || s.pending === id) && canPlayNow(s, id);
         const b = cardEl(id, make, 'button');
         b.type = 'button';
         b.classList.add('c8-in-hand');
@@ -255,6 +284,8 @@ export default {
         const row = make('div', 'c8-after-draw');
         row.append(make('span', null, 'Изтегли карта, която става. Изиграй я или пропусни.'), pass);
         handWrap.append(row);
+      } else if (myTurn && s.owed) {
+        handWrap.append(make('p', 'hint c8-owed', `Сложи +2 или +4, или докосни тестето и тегли ${s.owed}.`));
       } else if (myTurn && !canDrawAny(s) && !s.hands[meSeat].some((id) => canPlay(s, id))) {
         const pass = make('button', 'btn btn-small', 'Пропусни');
         pass.type = 'button';
@@ -378,7 +409,10 @@ function lastText(s, ctx) {
   let t;
   if (l.kind === 'draw') return `${who} тегли карта.`;
   if (l.kind === 'pass') return `${who} пропусна.`;
+  if (l.kind === 'owed') return `${who} тегли ${l.drew} и пропуска.`;
   if (l.kind === '8') t = `${who} изигра осмица. Цветът е ${COLORS[l.color]}.`;
+  else if (l.kind === 'w4' && l.owed) t = `${who} изигра +4. Цветът е ${COLORS[l.color]}. ${ctx.nickOf(s.players[l.target])} дължи ${l.owed}.`;
+  else if (l.kind === 'plus2' && l.owed) t = `${who} изигра +2. ${ctx.nickOf(s.players[l.target])} дължи ${l.owed}.`;
   else if (l.kind === 'w4') t = `${who} изигра +4. Цветът е ${COLORS[l.color]}. ${ctx.nickOf(s.players[l.target])} тегли ${l.drew} и пропуска.`;
   else if (l.kind === 'skip') t = `${who} изигра „Пропусни“. ${ctx.nickOf(s.players[l.target])} пропуска.`;
   else if (l.kind === 'rev') t = s.players.length === 2 ? `${who} изигра „Обратно“ и играе пак.` : `${who} обърна посоката.`;

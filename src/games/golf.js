@@ -12,7 +12,10 @@ export const COURSES = [
   { name: 'Правата', par: 2, tee: [50, 135], hole: [50, 20], walls: [[35, 70, 65, 80]], sand: [] },
   { name: 'Завоят', par: 3, tee: [20, 135], hole: [80, 18], walls: [[0, 0, 60, 90]], sand: [[62, 95, 100, 115]] },
   { name: 'Пясъкът', par: 3, tee: [50, 140], hole: [50, 15], walls: [[0, 100, 40, 108], [60, 40, 100, 48]], sand: [[20, 55, 80, 85]] },
+  { name: 'Зигзагът', par: 4, tee: [15, 140], hole: [85, 15], walls: [[0, 95, 70, 103], [30, 50, 100, 58]], sand: [[72, 60, 100, 75]] },
+  { name: 'Вратата', par: 3, tee: [50, 140], hole: [50, 32], walls: [[0, 60, 44, 66], [56, 60, 100, 66]], sand: [[25, 12, 75, 22]] },
 ];
+const courseOf = (s, h = s.hole) => COURSES[s.courses[Math.min(h, s.courses.length - 1)]];
 
 const r4 = (v) => Math.round(v * 1e4) / 1e4;
 const r3 = (v) => Math.round(v * 1e3) / 1e3;
@@ -46,7 +49,7 @@ export function simulate(course, from, dx, dy, power) {
   return { x, y, holed, path };
 }
 
-const freshBalls = (s, holeIdx) => s.players.map(() => ({ x: COURSES[holeIdx].tee[0], y: COURSES[holeIdx].tee[1], done: false, holed: false, strokes: 0 }));
+const freshBalls = (s, holeIdx) => s.players.map(() => ({ x: courseOf(s, holeIdx).tee[0], y: courseOf(s, holeIdx).tee[1], done: false, holed: false, strokes: 0 }));
 
 function nextSeat(balls, from) {
   for (let k = 1; k <= balls.length; k++) {
@@ -60,9 +63,9 @@ export default {
   id: 'golf',
   name: 'Мини голф',
   icon: '⛳',
-  blurb: 'Три писти, удари на ред. По-малко удари печели.',
+  blurb: 'Писти с препятствия, удари на ред. По-малко удари печели.',
   rules: [
-    'Играете три писти. На своя ред удряш топката веднъж.',
+    'Играете 3 или 5 писти. На своя ред удряш топката веднъж.',
     'Дръпни назад от топката като прашка: посоката е обратна, а колкото по-далеч дърпаш, толкова по-силно. Може и с плъзгачите отдолу.',
     'Стените отблъскват, пясъкът спира топката по-бързо. Твърде бърза топка прескача дупката.',
     `Пистата свършва, когато всички вкарат или стигнат ${MAX_STROKES} удара.`,
@@ -72,8 +75,13 @@ export default {
   maxPlayers: 4,
   moveSound: 'tap',
 
-  init(seed, players) {
-    const s = { players: players.slice(), hole: 0, turn: 0, scores: players.map(() => []), last: null, over: false };
+  options: [
+    { id: 'holes', label: 'Писти', default: 3, choices: [{ value: 3, label: '3' }, { value: 5, label: '5' }] },
+  ],
+
+  init(seed, players, opts = {}) {
+    const courses = (opts.holes ?? 3) === 5 ? [0, 1, 2, 3, 4] : [0, 1, 2];
+    const s = { players: players.slice(), courses, hole: 0, turn: 0, scores: players.map(() => []), last: null, over: false };
     s.balls = freshBalls(s, 0);
     return s;
   },
@@ -93,7 +101,7 @@ export default {
   applyMove(s0, m) {
     const s = { ...s0, balls: s0.balls.map((b) => ({ ...b })), scores: s0.scores.map((x) => x.slice()) };
     const seat = s.turn;
-    const course = COURSES[s.hole];
+    const course = courseOf(s);
     const ball = s.balls[seat];
     const res = simulate(course, [ball.x, ball.y], r3(m.dx), r3(m.dy), r3(m.power));
     ball.x = res.x; ball.y = res.y; ball.strokes += 1;
@@ -104,7 +112,7 @@ export default {
     if (next !== -1) { s.turn = next; return s; }
     // пистата свърши
     s.balls.forEach((b, i) => s.scores[i].push(b.strokes));
-    if (s.hole + 1 >= COURSES.length) { s.over = true; return s; }
+    if (s.hole + 1 >= s.courses.length) { s.over = true; return s; }
     s.hole += 1;
     s.balls = freshBalls(s, s.hole);
     s.turn = s.hole % s.players.length;
@@ -112,7 +120,7 @@ export default {
   },
 
   botMove(s, p, rng, level = 'medium') {
-    const course = COURSES[s.hole];
+    const course = courseOf(s);
     const b = s.balls[s.turn];
     let best = null;
     for (let a = 0; a < 360; a += 5) {
@@ -132,7 +140,7 @@ export default {
   },
 
   autoMove(s, p, rng) {
-    const course = COURSES[s.hole];
+    const course = courseOf(s);
     const b = s.balls[s.turn];
     let dx = course.hole[0] - b.x, dy = course.hole[1] - b.y;
     dx += (rng.next() - 0.5) * 20; dy += (rng.next() - 0.5) * 20;
@@ -161,7 +169,7 @@ export default {
     const NS = 'http://www.w3.org/2000/svg';
     const seat = s.players.indexOf(ctx.me);
     const myTurn = !ctx.over && seat === s.turn;
-    const course = COURSES[Math.min(s.hole, COURSES.length - 1)];
+    const course = courseOf(s);
     const make = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
     el.innerHTML = '';
@@ -268,7 +276,7 @@ export default {
     s.players.forEach((p) => hr.append(make('th', 'r', ctx.nickOf(p))));
     const thead = make('thead'); thead.append(hr); t.append(thead);
     const tb = make('tbody');
-    COURSES.forEach((c, h) => {
+    s.courses.map((i) => COURSES[i]).forEach((c, h) => {
       const tr = make('tr'); tr.append(make('th', null, `${h + 1}. ${c.name} (пар ${c.par})`));
       s.players.forEach((p, i) => tr.append(make('td', 'r num', h < s.scores[i].length ? String(s.scores[i][h]) : h === s.hole && !s.over ? `${s.balls[i].strokes}${s.balls[i].holed ? ' ✓' : ''}` : '')));
       tb.append(tr);
@@ -277,7 +285,7 @@ export default {
     s.players.forEach((p, i) => tot.append(make('td', 'r num', String(s.scores[i].reduce((a, b) => a + b, 0) + (s.over ? 0 : s.balls[i].strokes)))));
     tb.append(tot); t.append(tb); wrap.append(t);
 
-    const info = `Писта ${Math.min(s.hole, COURSES.length - 1) + 1} от ${COURSES.length}: ${course.name}, пар ${course.par}. `;
+    const info = `Писта ${Math.min(s.hole, s.courses.length - 1) + 1} от ${s.courses.length}: ${course.name}, пар ${course.par}. `;
     const msg = make('p', 'c8-msg', info + (l ? (l.holed ? `${ctx.nickOf(s.players[l.seat])} вкара с ${l.strokes} ${l.strokes === 1 ? 'удар' : 'удара'}!` : `${ctx.nickOf(s.players[l.seat])} удари (${l.strokes}).`) : 'Първи удар.'));
     el.append(msg, svg, controls, wrap);
   },

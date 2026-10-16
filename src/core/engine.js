@@ -17,8 +17,18 @@ export function sortLog(log) {
   );
 }
 
-export function replay(game, { seed, players, log = [], startedAt = 0, turnLimitMs = 0 }) {
-  let state = game.init(seed, players);
+// Настройките на играта: стойностите по подразбиране + избраните в стаята.
+export function optionsFor(game, chosen = {}) {
+  const out = {};
+  for (const o of game.options ?? []) {
+    const v = chosen?.[o.id];
+    out[o.id] = o.choices.some((c) => c.value === v) ? v : o.default;
+  }
+  return out;
+}
+
+export function replay(game, { seed, players, log = [], startedAt = 0, turnLimitMs = 0, options = {} }) {
+  let state = game.init(seed, players, optionsFor(game, options));
   let turnStartedAt = startedAt;
   let resigned = null;
   const accepted = [];

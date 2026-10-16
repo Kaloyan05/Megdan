@@ -1,7 +1,7 @@
 // Точки и кутийки — 2–4 играчи. Затвориш ли кутийка, играеш пак.
 // Линии: първо хоризонталните (R+1)×C, после вертикалните R×(C+1).
 
-const sizeFor = (n) => (n <= 2 ? 4 : 5);
+const sizeFor = (n, size) => (size && size !== 'auto' ? Number(size) : n <= 2 ? 4 : 5);
 
 function geometry(R, C) {
   const H = (R + 1) * C;
@@ -33,8 +33,12 @@ export default {
   maxPlayers: 4,
   moveSound: 'tap',
 
-  init(seed, players) {
-    const R = sizeFor(players.length), C = R;
+  options: [
+    { id: 'size', label: 'Размер', default: 'auto', choices: [{ value: 'auto', label: 'Според играчите' }, { value: '3', label: '3×3' }, { value: '4', label: '4×4' }, { value: '5', label: '5×5' }, { value: '6', label: '6×6' }] },
+  ],
+
+  init(seed, players, opts = {}) {
+    const R = sizeFor(players.length, opts.size), C = R;
     const g = geometry(R, C);
     return {
       players: players.slice(), R, C, turn: 0,

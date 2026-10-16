@@ -128,6 +128,7 @@ async function route() {
 
   const code = normalizeCode(hash);
   if (hash && code.length === 4) {
+    currentRoom = code; // още докато влизаме: без известие „Твой ход“ за тази стая
     mount(main, h('p', { class: 'muted', text: `Влизам в стая ${code}...` }));
     const res = await api.joinRoom(code, profile).catch((e) => ({ ok: false, reason: e?.code === 'invalid_argument' ? 'no-write' : 'error' }));
     if (!res.ok) {
@@ -153,17 +154,17 @@ async function route() {
       if (res.ok) go(c);
       return res;
     },
-    onSolo: async (game, { timerSec, level, count }) => {
+    onSolo: async (game, { timerSec, level, count, options }) => {
       try {
-        const c = await api.playVsBots({ game, timerSec, profile, count, level });
+        const c = await api.playVsBots({ game, timerSec, profile, count, level, options });
         go(c);
       } catch (e) {
         toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да започна игра. Опитай пак.', 4000);
       }
     },
-    onCreate: async (gameId, timerSec = 0) => {
+    onCreate: async (gameId, timerSec = 0, options = {}) => {
       try {
-        const c = await api.createRoom({ gameId, timerSec, profile });
+        const c = await api.createRoom({ gameId, timerSec, profile, options });
         go(c);
       } catch (e) {
         toast(e?.code === 'invalid_argument' ? NO_WRITE : 'Не успях да създам стая. Опитай пак.', 4000);
