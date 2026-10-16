@@ -42,6 +42,7 @@ export function createTurnWatcher(api) {
       w.off = api.watchRoomLite(c, (v) => {
         const prev = w.summary;
         w.summary = summarize(c, v);
+        if (w.summary.gone) api.removeMyRoom(c).catch(() => {}); // стаята е изтрита
         // Нов „твой ход“ (не при първото зареждане): известие.
         if (prev && !prev.myTurn && w.summary.myTurn) turnSubs.forEach((fn) => fn(w.summary));
         emit();

@@ -16,6 +16,7 @@ import { renderRooms } from './ui/rooms.js';
 import { renderLeaderboard } from './ui/leaderboard.js';
 import { createTurnWatcher } from './ui/turns.js';
 import { injectGameCss } from './games/index.js';
+import { sweepRooms, sweepMySecrets } from './net/cleanup.js';
 
 const NO_WRITE = 'Нямаш права да играеш тук. Помоли собственика да те покани с право „Can edit“.';
 const appEl = document.getElementById('app');
@@ -193,6 +194,16 @@ async function boot() {
     try { navigator.vibrate?.(80); } catch { /* няма вибрация */ }
     toast(`Твой ход: ${s.game?.name ?? 'стая'} ${s.code}`, 4000);
   });
+
+  // Почистване веднъж на ден, след като страницата се е заредила.
+  const DAY = 24 * 3600 * 1000;
+  if (Date.now() - (storageGet('lastSweep') ?? 0) > DAY && store.canWrite !== false) {
+    setTimeout(() => {
+      storageSet('lastSweep', Date.now());
+      sweepRooms(store).catch(() => {});
+      sweepMySecrets(store, api.me).catch(() => {});
+    }, 15000 + Math.random() * 15000);
+  }
 
   mount(appEl, topbar(), main, bottomNav());
   window.addEventListener('hashchange', route);
