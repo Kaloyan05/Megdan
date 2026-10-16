@@ -258,6 +258,8 @@ export default {
         }
         if (lastStep && lastStep.from === idx && shown < 5) { const g = make('span', 'tb-ch tb-slot'); g.dataset.fx = 'tb-src'; stack.append(g); }
         btn.append(stack);
+        // Номер на полето от моята гледна точка (1 е последното преди изнасяне).
+        btn.append(make('span', 'tb-num', String(persp(seatMe < 0 ? 0 : seatMe, idx) + 1)));
         return btn;
       };
       const barEl = (top) => {
@@ -334,8 +336,7 @@ export default {
 /* Дъска: рамка от орех, игрално поле от светло дърво, триъгълници в бордо и слонова кост. */
 .tb { position:relative; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)) minmax(0,.8fr) repeat(6,minmax(0,1fr)); grid-template-rows:auto auto;
   width:min(100%,520px); margin-inline:auto; padding:10px 8px; gap:0 2px; border-radius:16px; border:2px solid #3a200c;
-  background:
-    repeating-linear-gradient(92deg, rgb(120 70 20 / .08) 0 2px, transparent 2px 11px),
+  background: var(--wood-v), var(--grain),
     linear-gradient(180deg,#e2b97f,#d3a466 50%,#e2b97f);
   box-shadow: inset 0 0 0 7px #6b3d1b, inset 0 0 0 9px #3a200c, inset 0 4px 14px rgb(60 30 5 / .35), 0 8px 0 #2f1a0a, 0 16px 26px rgb(40 20 5 / .35); }
 .tb-pt { position:relative; height:clamp(120px,34vw,170px); border:0; padding:0; background:none; cursor:default; display:flex; }
@@ -366,10 +367,17 @@ export default {
 .tb-pt.top.tgt::after { bottom:14%; }
 .tb-pt.bottom.tgt::after { top:14%; }
 .tb-pt:focus-visible, .tb-barcol:focus-visible, .tb-offbox:focus-visible { outline:3px solid var(--focus); outline-offset:-3px; }
-.tb-barcol { grid-row:auto; border:0; padding:4px 0; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:default;
+.tb-num { position:absolute; left:0; right:0; z-index:0; font:700 8px/1 var(--f-body); color:rgb(255 225 180 / .85); text-align:center; pointer-events:none; }
+.tb-pt.top .tb-num { top:-10px; }
+.tb-pt.bottom .tb-num { bottom:-10px; }
+.tb-barcol { position:relative; grid-row:auto; border:0; padding:4px 0; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:default;
   background: repeating-linear-gradient(92deg, rgb(0 0 0 / .1) 0 2px, transparent 2px 8px), linear-gradient(90deg,#4a2810,#6b3d1b 50%,#4a2810);
   box-shadow: inset 0 0 6px rgb(0 0 0 / .4); }
 .tb-barcol.src { cursor:pointer; box-shadow:inset 0 0 0 3px var(--sun); }
+/* Месингова панта в средата на кутията. */
+.tb-barcol::before { content:''; position:absolute; left:18%; right:18%; top:38%; height:16%; border-radius:3px; z-index:0;
+  background:linear-gradient(90deg,#8a6a1e,#f2d27a 45%,#b8902e 60%,#7a5a14); box-shadow:0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(0 0 0 / .25); }
+.tb-barcol > * { position:relative; z-index:1; }
 .tb-off { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
 .tb-offbox { display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:var(--r-pill); border:2px solid var(--line); background:var(--surface); font-weight:700; cursor:default; }
 .tb-offbox .tb-ch { width:20px; }

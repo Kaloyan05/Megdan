@@ -282,7 +282,31 @@ export default {
         }
         board.append(cell);
       }
-      el.append(top, board);
+      // Координати по рамката (от гледната точка на играча).
+      const files = 'abcdefgh'.split('');
+      for (let k = 0; k < N; k++) {
+        const f = make('span', 'ck-coord file', files[flip ? N - 1 - k : k]);
+        f.style.left = `calc(10px + (100% - 20px) * ${(k + 0.5) / N})`;
+        const r = make('span', 'ck-coord rank', String(flip ? k + 1 : N - k));
+        r.style.top = `calc(10px + (100% - 20px) * ${(k + 0.5) / N})`;
+        board.append(f, r);
+      }
+      // Тава с взетите фигури за всеки играч.
+      const tray = make('div', 'ck-trays');
+      s.players.forEach((pl, i) => {
+        const took = 12 - counts[1 - i];
+        const t = make('div', 'ck-tray');
+        t.append(make('span', 'ck-tray-name', `${ctx.nickOf(pl)} взе ${took}`));
+        const stack = make('span', 'ck-tray-stack');
+        for (let k = 0; k < took; k++) {
+          const m = make('span', 'ck-mini');
+          m.style.setProperty('--p', `var(--seat-${2 - i})`);
+          stack.append(m);
+        }
+        t.append(stack);
+        tray.append(t);
+      });
+      el.append(top, board, tray);
     };
     draw();
   },
@@ -302,14 +326,14 @@ export default {
 
   css: `
 /* Дъска от дърво: светъл явор и тъмен орех с фина шарка, рамка с ръб. */
-.ck { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); width:min(100%,440px); margin-inline:auto; padding:10px; border-radius:16px;
-  background:linear-gradient(135deg,#7a4a22,#5a3214 60%,#6b3d1b); border:2px solid #3a200c;
+.ck { position:relative; display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); width:min(100%,440px); margin-inline:auto; padding:10px; border-radius:16px;
+  background:var(--wood), linear-gradient(135deg,#7a4a22,#5a3214 60%,#6b3d1b); border:2px solid #3a200c;
   box-shadow: inset 0 2px 0 rgb(255 220 170 / .35), inset 0 -3px 0 rgb(0 0 0 / .35), 0 8px 0 #2f1a0a, 0 16px 26px rgb(40 20 5 / .35); }
 .ck-cell { aspect-ratio:1; display:grid; place-items:center; border:0; padding:0; position:relative; }
-.ck-cell.light { background:
+.ck-cell.light { background: var(--wood),
   repeating-linear-gradient(100deg, rgb(160 110 50 / .07) 0 3px, transparent 3px 9px),
   linear-gradient(160deg,#f6e4c0,#e9cf9e); }
-.ck-cell.dark { cursor:default; background:
+.ck-cell.dark { cursor:default; background: var(--wood-v),
   repeating-linear-gradient(80deg, rgb(0 0 0 / .08) 0 2px, transparent 2px 7px),
   linear-gradient(160deg,#8d5b2d,#6e4220); }
 .ck-cell.dark.last { background:
@@ -333,6 +357,17 @@ export default {
   transition: transform .18s cubic-bezier(.2,1.4,.4,1), box-shadow .18s; }
 .ck-piece.king { box-shadow: inset 0 0 0 3px var(--ring-d), inset 0 0 0 5px var(--ring-l), inset 0 0 0 7px color-mix(in srgb, var(--p) 85%, #000),
     0 4px 0 -1px var(--edge), 0 8px 0 -1px color-mix(in srgb, var(--p) 80%, #000), 0 11px 0 -1px var(--edge), 0 13px 10px rgb(0 0 0 / .35); transform:translateY(-4px); }
+.ck-coord { position:absolute; font:700 9px/1 var(--f-body); color:rgb(255 225 180 / .8); pointer-events:none; text-transform:uppercase; }
+.ck-coord.file { bottom:0; translate:-50% 0; }
+.ck-coord.rank { left:2px; translate:0 -50%; }
+.ck-trays { display:flex; justify-content:center; gap:12px 22px; flex-wrap:wrap; margin-top:16px; }
+.ck-tray { display:grid; gap:4px; justify-items:center; }
+.ck-tray-name { font-size:var(--step--1); color:var(--ink-2); font-weight:700; }
+.ck-tray-stack { display:flex; min-height:22px; padding:4px 8px; border-radius:999px; background:linear-gradient(180deg,#6b3d1b,#4a2810);
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / .4); }
+.ck-mini { width:16px; height:16px; margin-left:-6px; border-radius:50%; background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--p) 45%, #fff), var(--p) 50%, color-mix(in srgb, var(--p) 70%, #000));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--p) 70%, #000), 0 1px 1px rgb(0 0 0 / .5); }
+.ck-mini:first-child { margin-left:0; }
 .ck-crown { color:#ffd54a; font-size:clamp(.95rem,4.2vw,1.35rem); line-height:1; text-shadow:0 1px 0 #7a5200, 0 0 6px rgb(255 213 74 / .6); }
 .ck-piece.taken { opacity:.4; filter:grayscale(.5); transform:scale(.88); transition: opacity .3s .25s, transform .3s .25s; }
 .ck-piece.just-taken { animation: ckHit .45s ease-out .25s backwards; }

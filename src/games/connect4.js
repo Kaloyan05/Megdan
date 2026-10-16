@@ -174,6 +174,8 @@ export default {
     grid.style.setProperty('--c4-cols', COLS);
     grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', 'Дъска');
+    const meSeat = s.players.indexOf(ctx.me);
+    if (meSeat >= 0) grid.style.setProperty('--me', `var(--seat-${meSeat + 1})`);
     for (let c = 0; c < COLS; c++) {
       const col = document.createElement('button');
       col.className = 'c4-col';
@@ -196,7 +198,12 @@ export default {
       }
       grid.append(col);
     }
-    el.append(grid);
+    // Рамка с винтове и крачета, като истинска игра.
+    for (const corner of ['tl', 'tr', 'bl', 'br']) { const sc = document.createElement('i'); sc.className = `c4-screw ${corner}`; grid.append(sc); }
+    const stand = document.createElement('div');
+    stand.className = 'c4-stand';
+    stand.append(grid);
+    el.append(stand);
   },
 
   // Мини изглед за картата в лобито: истинско разположение от партида.
@@ -219,8 +226,24 @@ export default {
   padding:clamp(8px,2.4vw,14px); border-radius:var(--r-lg); width:min(100%,440px); margin-inline:auto;
   background:linear-gradient(180deg, color-mix(in srgb, var(--board) 82%, #fff), var(--board) 18%, var(--board) 80%, color-mix(in srgb, var(--board) 78%, #000));
   box-shadow: inset 0 2px 0 rgb(255 255 255 / .35), inset 0 -4px 0 rgb(0 0 0 / .25), 0 8px 0 color-mix(in srgb, var(--board) 55%, #000), 0 16px 24px rgb(0 0 0 / .25); }
-.c4-col { display:flex; flex-direction:column; gap:clamp(3px,1.2vw,8px); border:0; padding:0;
+.c4-stand { position:relative; width:min(100%,440px); margin:44px auto 26px; }
+.c4-stand::before, .c4-stand::after { content:''; position:absolute; bottom:-22px; width:16%; height:30px; border-radius:6px 6px 10px 10px;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--board) 70%, #000), color-mix(in srgb, var(--board) 50%, #000)); z-index:-1;
+  box-shadow: 0 6px 10px rgb(0 0 0 / .25); }
+.c4-stand::before { left:4%; transform:skewX(12deg); }
+.c4-stand::after { right:4%; transform:skewX(-12deg); }
+.c4 { position:relative; }
+.c4-screw { position:absolute; width:9px; height:9px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #fff, #b8c0cc 50%, #6b7685);
+  box-shadow: 0 1px 1px rgb(0 0 0 / .4); }
+.c4-screw::after { content:''; position:absolute; left:2px; right:2px; top:4px; height:1.5px; background:#5a6472; transform:rotate(35deg); }
+.c4-screw.tl { left:4px; top:4px; } .c4-screw.tr { right:4px; top:4px; } .c4-screw.bl { left:4px; bottom:4px; } .c4-screw.br { right:4px; bottom:4px; }
+.c4-col { position:relative; display:flex; flex-direction:column; gap:clamp(3px,1.2vw,8px); border:0; padding:0;
   background:transparent; cursor:pointer; border-radius:999px; }
+/* Над колоната виси дискът, който ще пуснеш. */
+.c4-col:not(:disabled)::before { content:''; position:absolute; left:6%; right:6%; aspect-ratio:1; bottom:calc(100% + clamp(10px,3vw,18px)); border-radius:50%;
+  background:radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--me, var(--seat-1)) 45%, #fff) 0 10%, var(--me, var(--seat-1)) 45%, color-mix(in srgb, var(--me, var(--seat-1)) 75%, #000) 100%);
+  box-shadow: 0 4px 6px rgb(0 0 0 / .25); opacity:0; transform:translateY(6px); transition: opacity .15s, transform .15s; pointer-events:none; }
+.c4-col:not(:disabled):hover::before, .c4-col:not(:disabled):focus-visible::before { opacity:.95; transform:none; }
 .c4-col:disabled { cursor:default; }
 .c4-col:not(:disabled):hover .c4-cell, .c4-col:focus-visible .c4-cell { background:var(--board-hole-hi); }
 .c4-col:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
@@ -233,7 +256,7 @@ export default {
 .disc.drop { z-index:3; animation:c4drop calc(.14s + var(--rows) * .055s) cubic-bezier(.5,0,.75,0) both,
   c4bounce .3s calc(.14s + var(--rows) * .055s) ease-out; }
 .disc.last:not(.drop)::after { content:''; position:absolute; inset:34%; border-radius:50%; background:rgb(255 255 255 / .55); }
-.disc.win { animation:c4win .8s ease-in-out infinite alternate; }
+.disc.win { animation:c4win .8s ease-in-out infinite alternate; outline:3px solid #ffd54a; outline-offset:2px; }
 @keyframes c4drop { from { transform:translateY(calc(var(--rows) * -115%)); } }
 @keyframes c4bounce { 35% { transform:translateY(-14%) scaleY(1.04); } 60% { transform:translateY(0) scaleY(.94); } 80% { transform:translateY(-3%); } }
 @keyframes c4win { to { transform:scale(.84); filter:brightness(1.25); } }

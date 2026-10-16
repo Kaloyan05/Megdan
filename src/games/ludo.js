@@ -22,11 +22,12 @@ const HOMES = [
   [[9, 5], [8, 5], [7, 5], [6, 5]],
   [[5, 9], [5, 8], [5, 7], [5, 6]],
 ];
+// Базите са в средата на цветния ъгъл (само за рисуване).
 const BASES = [
-  [[0, 0], [1, 0], [0, 1], [1, 1]],
-  [[9, 0], [10, 0], [9, 1], [10, 1]],
-  [[9, 9], [10, 9], [9, 10], [10, 10]],
-  [[0, 9], [1, 9], [0, 10], [1, 10]],
+  [[1, 1], [2, 1], [1, 2], [2, 2]],
+  [[8, 1], [9, 1], [8, 2], [9, 2]],
+  [[8, 8], [9, 8], [8, 9], [9, 9]],
+  [[1, 8], [2, 8], [1, 9], [2, 9]],
 ];
 const cornersFor = (n) => (n === 2 ? [0, 2] : [0, 1, 2, 3].slice(0, n));
 const absOf = (corner, rel) => (corner * 10 + rel) % TRACK;
@@ -181,12 +182,31 @@ export default {
     board.setAttribute('role', 'group');
     board.setAttribute('aria-label', 'Дъска');
     const place = (node, [c, r]) => { node.style.gridColumn = String(c + 1); node.style.gridRow = String(r + 1); board.append(node); };
+    // Класическа дъска: цветни ъгли с „двор“ за базата и цветен център към къщичките.
+    const seatOfCorner = (corner) => s.corners.indexOf(corner);
+    const tintOf = (corner) => (seatOfCorner(corner) >= 0 ? `var(--seat-${seatOfCorner(corner) + 1})` : '#b9ad95');
+    [[0, 0], [7, 0], [7, 7], [0, 7]].forEach(([c0, r0], corner) => {
+      const q = make('span', 'ld-quad');
+      q.style.gridColumn = `${c0 + 1} / span 4`; q.style.gridRow = `${r0 + 1} / span 4`;
+      q.style.setProperty('--tint', tintOf(corner));
+      board.append(q);
+      const [bc, br] = BASES[corner][0];
+      const yard = make('span', 'ld-yard');
+      yard.style.gridColumn = `${bc + 1} / span 2`; yard.style.gridRow = `${br + 1} / span 2`;
+      yard.style.setProperty('--tint', tintOf(corner));
+      board.append(yard);
+    });
+    const mid = make('span', 'ld-mid');
+    mid.style.gridColumn = '5 / span 3'; mid.style.gridRow = '5 / span 3';
+    mid.style.setProperty('--t0', tintOf(0)); mid.style.setProperty('--t1', tintOf(1)); mid.style.setProperty('--t2', tintOf(2)); mid.style.setProperty('--t3', tintOf(3));
+    board.append(mid);
     PATH.forEach((xy, i) => {
       const cell = make('span', 'ld-cell');
       cell.dataset.fx = `ld-p${i}`;
       const startCorner = i % 10 === 0 ? i / 10 : -1;
       const seat = s.corners.indexOf(startCorner);
       if (seat >= 0) cell.style.setProperty('--tint', `var(--seat-${seat + 1})`), cell.classList.add('start');
+      if (startCorner >= 0) cell.style.setProperty('--rot', `${startCorner * 90}deg`);
       place(cell, xy);
     });
     s.corners.forEach((corner, seat) => {
@@ -252,10 +272,22 @@ export default {
   css: `
 .ld-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center; margin-bottom:10px; }
 .ld-bar .hint { min-height:1.4em; }
-.ld { display:grid; grid-template-columns:repeat(11,minmax(0,1fr)); grid-template-rows:repeat(11,auto); gap:3px; width:min(100%,440px); margin-inline:auto;
-  padding:10px; border-radius:18px; border:2px solid #3a200c;
-  background: repeating-linear-gradient(95deg, rgb(120 70 20 / .05) 0 2px, transparent 2px 12px), linear-gradient(160deg,#fbf0d9,#f0dcb4);
-  box-shadow: inset 0 0 0 6px #b0753c, inset 0 0 0 8px #6b3d1b, 0 8px 0 #4a2810, 0 16px 26px rgb(40 20 5 / .3); }
+.ld { position:relative; display:grid; grid-template-columns:repeat(11,minmax(0,1fr)); grid-template-rows:repeat(11,auto); gap:3px; width:min(100%,440px); margin-inline:auto;
+  padding:12px; border-radius:18px; border:2px solid #3a200c;
+  background: var(--grain), linear-gradient(160deg,#fbf0d9,#f0dcb4);
+  box-shadow: inset 0 0 0 7px #b0753c, inset 0 0 0 9px #6b3d1b, inset 0 3px 10px rgb(80 45 10 / .25), 0 8px 0 #4a2810, 0 16px 26px rgb(40 20 5 / .3); }
+.ld::before { content:''; position:absolute; inset:2px; border-radius:16px; background:var(--wood); opacity:.55; pointer-events:none; mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) content-box; padding:7px; }
+/* Ъгъл в цвета на играча и бял двор за базата. */
+.ld-quad { z-index:0; margin:-2px; border-radius:14px; background:
+  radial-gradient(120% 120% at 30% 25%, color-mix(in srgb, var(--tint) 55%, #fff), color-mix(in srgb, var(--tint) 85%, #000));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tint) 60%, #000), inset 0 2px 0 rgb(255 255 255 / .35); }
+.ld-yard { z-index:0; margin:-5px; border-radius:50%; background:radial-gradient(circle at 45% 40%, #fffaf0, #efe2c4);
+  box-shadow: inset 0 3px 6px rgb(60 30 0 / .3), 0 0 0 3px rgb(255 255 255 / .55); }
+.ld-mid { z-index:0; margin:-1px; border-radius:6px; background: conic-gradient(from -45deg, var(--t1) 0 25%, var(--t2) 0 50%, var(--t3) 0 75%, var(--t0) 0);
+  opacity:.55; box-shadow: inset 0 0 0 2px rgb(0 0 0 / .2); }
+.ld > .ld-cell, .ld > .ld-piece, .ld > .ld-center { position:relative; z-index:1; }
+.ld-cell.start::after { content:'›'; position:absolute; inset:0; display:grid; place-items:center; color:#fff; font:800 clamp(.8rem,4vw,1.2rem)/1 var(--f-display);
+  transform:rotate(var(--rot)); text-shadow:0 1px 1px rgb(0 0 0 / .4); }
 /* Клетки: вдлъбнати гнезда. */
 .ld-cell { aspect-ratio:1; border-radius:50%; grid-area:auto; background:radial-gradient(circle at 50% 40%, #fffaf0, #eadbbd);
   box-shadow: inset 0 2px 3px rgb(80 50 10 / .3), inset 0 -1px 0 rgb(255 255 255 / .8), 0 0 0 1.5px rgb(120 80 30 / .35); }
@@ -266,7 +298,7 @@ export default {
 .ld-center { display:grid; place-items:center; --die-size:100%; }
 .ld-center .die3d { width:92%; padding:12%; }
 /* Пионка, гледана отгоре: основа, вдлъбнатина и глава. */
-.ld-piece { --edge: color-mix(in srgb, var(--p) 50%, #000); z-index:1; place-self:center; width:80%; aspect-ratio:1; border-radius:50%; padding:0; position:relative;
+.ld-piece { --edge: color-mix(in srgb, var(--p) 50%, #000); z-index:2 !important; place-self:center; width:80%; aspect-ratio:1; border-radius:50%; padding:0; position:relative;
   border:1px solid rgb(0 0 0 / .5);
   background:
     radial-gradient(circle at 42% 36%, color-mix(in srgb, var(--p) 30%, #fff) 0 9%, color-mix(in srgb, var(--p) 85%, #fff) 16%, var(--p) 30%, color-mix(in srgb, var(--p) 65%, #000) 38%, transparent 40%),

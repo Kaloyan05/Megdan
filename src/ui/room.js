@@ -11,7 +11,7 @@ import { TIMERS, pillGroup, openRulesSheet, openGamePicker, openSheet, optionsCo
 import { isBot, botMove, BOT_LEVELS } from '../core/bots.js';
 import { seriesTotals, seriesDone, pickSeriesGames } from '../core/series.js';
 import { GAMES } from '../games/index.js';
-import { playFx, reducedMotion } from './fx.js';
+import { playFx, reducedMotion, confetti } from './fx.js';
 
 const REACTIONS = ['👍', '😂', '😮', '😡', '🎉', '❤️'];
 const HOST_GRACE_MS = 20000;
@@ -581,7 +581,14 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
     const room = view.room;
     if (pending || !result || result.over) return;
     const check = result.game.validateMove(result.state, move, me);
-    if (!check.ok) { sound.bad(); toast(REASONS[check.reason] ?? 'Този ход не е позволен.'); return; }
+    if (!check.ok) {
+      sound.bad(); vibrate(40);
+      // Дъската се клати при невъзможен ход.
+      const bw = stageEl.querySelector('.board-wrap');
+      if (bw) { bw.classList.remove('shake'); void bw.offsetWidth; bw.classList.add('shake'); setTimeout(() => bw.classList.remove('shake'), 450); }
+      toast(REASONS[check.reason] ?? 'Този ход не е позволен.');
+      return;
+    }
     pending = true;
     clearTimeout(pendingTimer);
     pendingTimer = setTimeout(() => { pending = false; stageKey = ''; update(); }, 5000);
@@ -648,9 +655,10 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       pending = false;
       clearTimeout(pendingTimer);
     }
-    if (result?.over && !lastOver && acc > 0) {
-      if (result.winner === me) sound.win();
-      else if (room.players.includes(me) && result.winner !== 'draw') sound.lose();
+    let endFx = null;
+    if (result?.over && !lastOver && acc > 0 && freshAcc === acc) {
+      if (result.winner === me) { sound.win(); endFx = 'won'; }
+      else if (room.players.includes(me) && result.winner !== 'draw') { sound.lose(); endFx = 'lost'; }
     }
     lastOver = Boolean(result?.over);
 
@@ -717,6 +725,12 @@ export function renderRoom(root, { api, code, onLeave, onRoomSeen }) {
       activeMembers(view.members).map((m) => [m.id, m.data.readyFor, m.data.nick, m.data.avatar]),
     ]);
     if (key !== stageKey) { stageKey = key; renderStage(); }
+    // Победа: конфети и златно сияние; загуба: дъската за миг посивява.
+    if (endFx) {
+      const bw = stageEl.querySelector('.board-wrap');
+      bw?.classList.add(endFx);
+      if (endFx === 'won') setTimeout(() => confetti(stageEl), 250);
+    }
     // „Твой ход!“ при смяна (не при първото зареждане и не при игри, в които всички играят наведнъж).
     const mineNow = Boolean(result && !result.over && room.status === 'playing' && room.players.includes(me) && !result.game.waitingFor && turnIds().includes(me));
     if (mineNow && wasMine === false) turnPop(result.accepted.length === 0 ? 'Ти започваш!' : 'Твой ход!');
